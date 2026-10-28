@@ -46,11 +46,16 @@
   });
 
   // Lần tương tác đầu tiên -> tự bật nhạc (trừ khi người dùng đã tắt)
-  const events = ['pointerdown', 'touchend', 'keydown'];
+  // Trên điện thoại chỉ touchend/pointerup/click mới tính là tương tác hợp lệ (pointerdown thì không),
+  // nên chỉ gỡ listener sau khi nhạc thật sự đã phát; nếu bị chặn thì thử lại ở lần chạm sau.
+  const events = ['touchend', 'pointerup', 'click', 'keydown'];
   const kickoff = (e) => {
     if (e.target && e.target.closest && e.target.closest('#music-toggle')) return;
-    events.forEach((ev) => removeEventListener(ev, kickoff, true));
-    if (!userPaused && audio.paused) play();
+    if (userPaused) { events.forEach((ev) => removeEventListener(ev, kickoff, true)); return; }
+    if (!audio.paused) return;
+    Promise.resolve(play()).then(() => {
+      if (!audio.paused) events.forEach((ev) => removeEventListener(ev, kickoff, true));
+    });
   };
   events.forEach((ev) => addEventListener(ev, kickoff, true));
 

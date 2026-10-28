@@ -18,18 +18,50 @@ export function useAudioContext(c) {
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 }
 
-function ready() {
-  if (!ctx) {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return false;
-    useAudioContext(new AC());
-  }
-  if (ctx.state === 'suspended' && ctx.resume) {
-    const r = ctx.resume();
-    if (r && r.catch) r.catch(() => {});
-  }
+function create() {
+  if (ctx) return true;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return false;
+  useAudioContext(new AC());
   return true;
 }
+
+function resume() {
+  if (ctx.state === 'running' || !ctx.resume) return;
+  const r = ctx.resume();
+  if (r && r.catch) r.catch(() => {});
+}
+
+function ready() {
+  if (!create()) return false;
+  resume();
+  return true;
+}
+
+/**
+ * Mở khoá âm thanh. Trên điện thoại, chạm xuống (pointerdown/touchstart) KHÔNG được tính là tương tác
+ * hợp lệ — chỉ khi nhấc tay (touchend/pointerup) hoặc click thì trình duyệt mới cho phát âm thanh.
+ * Vì vậy khởi tạo + resume AudioContext ở các sự kiện đó (giữ listener để mở lại sau khi bị ngắt).
+ */
+function unlock() {
+  try {
+    if (!create() || ctx.state === 'running') return;
+    // iOS 16.4+: phát cả khi gạt công tắc im lặng (giống nhạc/video)
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';
+    resume();
+    const s = ctx.createBufferSource(); // một mẫu im lặng để "đánh thức" bộ xử lý âm thanh trên iOS
+    s.buffer = ctx.createBuffer(1, 1, 22050);
+    s.connect(ctx.destination);
+    s.start(0);
+  } catch (e) { /* bỏ qua */ }
+}
+if (typeof window !== 'undefined' && !window.__sfxUnlockBound) {
+  window.__sfxUnlockBound = true;
+  ['touchend', 'pointerup', 'click', 'keydown'].forEach((ev) => addEventListener(ev, unlock, true));
+}
+
+/** Trạng thái AudioContext ('none' nếu chưa tạo) — dùng để kiểm tra. */
+export const audioState = () => (ctx ? ctx.state : 'none');
 
 function noiseSource(t, dur) {
   const s = ctx.createBufferSource();
