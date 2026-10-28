@@ -6,12 +6,12 @@ export const EVENT = {
   theme: 'Chào Xuân Đinh Mùi 2027',
 
   // TODO: confirm date & time (ISO 8601 with Vietnam timezone)
-  partyDate: '2027-01-22T17:30:00+07:00',
-  partyDateLabel: 'Thứ Sáu, 22.01.2027 · 17:30',
+  partyDate: '2027-01-15T17:30:00+07:00',
+  partyDateLabel: 'Thứ Sáu, 15.01.2027 · 17:30',
 
   // TODO: confirm venue
-  venue: 'Đang cập nhật',
-  address: 'Địa điểm sẽ được thông báo sớm',
+  venue: 'Công ty Terumo BCT Việt Nam',
+  address: 'Công ty Terumo BCT Việt Nam',
 
   // Mùng 1 Tết Đinh Mùi
   tetDate: '2027-02-06T00:00:00+07:00',
