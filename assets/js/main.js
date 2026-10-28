@@ -157,7 +157,7 @@ function init3D() {
     ray.setFromCamera(new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), camera);
     const to = ray.ray.at(40, new THREE.Vector3());
     to.y = Math.max(to.y, 8);
-    fireworks.launch(new THREE.Vector3(to.x + rand(-2, 2), 0, to.z), to);
+    fireworks.launch(new THREE.Vector3(to.x + rand(-2, 2), 0, to.z), to, undefined, true); // true = có tiếng pháo
   });
 
   addEventListener('resize', () => {

@@ -1,6 +1,7 @@
 // Pháo hoa: GPU-friendly particle fireworks (one Points object, ring-buffer of particles).
 import * as THREE from 'three';
 import { rand, pick } from './toon.js';
+import { rocketLaunch, rocketBurst } from './sfx.js';
 
 export const PALETTES = [
   ['#ffd23f', '#fff1a8', '#ff9f1c'],
@@ -66,14 +67,16 @@ export class Fireworks {
     this.drag[i] = drag;
   }
 
-  /** Launch a rocket from `from` that explodes at `to`. */
-  launch(from, to, palette = pick(PALETTES)) {
+  /** Launch a rocket from `from` that explodes at `to`. `sound` = có phát tiếng pháo (chỉ khi người dùng bấm). */
+  launch(from, to, palette = pick(PALETTES), sound = false) {
     const dur = rand(1.0, 1.5);
+    if (sound) rocketLaunch(dur);
     this.rockets.push({
       p: from.clone(),
       v: to.clone().sub(from).divideScalar(dur),
       left: dur,
       palette,
+      sound,
     });
   }
 
@@ -101,6 +104,7 @@ export class Fireworks {
       this._emit(k.p.x, k.p.y, k.p.z, rand(-0.4, 0.4), rand(-1.5, -0.5), rand(-0.4, 0.4), c, 0.5, 2);
       if (k.left <= 0) {
         this.burst(k.p, k.palette);
+        if (k.sound) rocketBurst();
         this.rockets.splice(r, 1);
       }
     }
