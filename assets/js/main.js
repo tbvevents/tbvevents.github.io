@@ -10,6 +10,7 @@ import { EVENT, AGENDA } from './config.js';
 import * as City from './world/cities.js';
 import { FOG_COLOR, createSky, createGround, createHorizonHaze, Petals, SkyLanterns, createJourneyPath } from './world/decor.js';
 import { Fireworks } from './world/fireworks.js';
+import { initSkyTap } from './sky-tap.js';
 import { toon, rand } from './world/toon.js';
 
 const { gsap, ScrollTrigger } = window;
@@ -152,12 +153,15 @@ function init3D() {
   const smoothPointer = new THREE.Vector2();
   addEventListener('pointermove', (e) => pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1));
   const ray = new THREE.Raycaster();
-  addEventListener('pointerdown', (e) => {
-    if (e.target.closest('a, button, input, .card, .agenda, .rsvp-card, nav, header')) return;
-    ray.setFromCamera(new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), camera);
-    const to = ray.ray.at(40, new THREE.Vector3());
-    to.y = Math.max(to.y, 8);
-    fireworks.launch(new THREE.Vector3(to.x + rand(-2, 2), 0, to.z), to, undefined, true); // true = có tiếng pháo
+  // Chạm/nhấp vào nửa trên màn hình (bầu trời) mới bắn pháo hoa — xem sky-tap.js
+  initSkyTap({
+    onSky: (x, y) => {
+      if (fireworks.rockets.length >= (isMobile ? 6 : 10)) return; // giữ FPS khi bấm dồn dập
+      ray.setFromCamera(new THREE.Vector2((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1), camera);
+      const to = ray.ray.at(40, new THREE.Vector3());
+      to.y = Math.max(to.y, 8);
+      fireworks.launch(new THREE.Vector3(to.x + rand(-2, 2), 0, to.z), to, undefined, true); // true = có tiếng pháo
+    },
   });
 
   addEventListener('resize', () => {

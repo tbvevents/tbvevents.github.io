@@ -439,3 +439,43 @@ main { position: relative; z-index: 5; }
 .music-toggle.is-on .ic-mute { opacity: 0; }
 @keyframes music-pulse { 50% { box-shadow: 0 0 26px rgba(255, 207, 74, 0.85); } }
 @media (prefers-reduced-motion: reduce) { .music-toggle.is-on { animation: none; } }
+
+/* Chạm vào bầu trời để bắn pháo hoa */
+html.sky-hover { cursor: crosshair; }
+.sky-ripple {
+  position: fixed;
+  z-index: 14;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  border: 2px solid var(--gold);
+  box-shadow: 0 0 14px rgba(255, 207, 74, 0.8);
+  pointer-events: none;
+  animation: sky-ripple 0.7s ease-out forwards;
+}
+@keyframes sky-ripple { from { transform: scale(0.4); opacity: 0.95; } to { transform: scale(5); opacity: 0; } }
+.sky-hint {
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 72px);
+  translate: -50% -8px;
+  z-index: 30;
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--gold-soft);
+  font: 600 13px/1.35 var(--sans);
+  text-align: center;
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, translate 0.3s;
+}
+.sky-hint.is-on { opacity: 1; translate: -50% 0; }
+@media (prefers-reduced-motion: reduce) {
+  .sky-ripple { animation-duration: 0.01s; }
+  .sky-hint { transition: none; }
+}
