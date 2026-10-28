@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Year End Party 2026 · Terumo BCT Việt Nam</title>
+  <meta name="description" content="Year End Party 2026 của Terumo BCT Việt Nam — Chào Xuân Đinh Mùi 2027. Du xuân qua Hà Nội, Huế, Đà Nẵng, Hội An và TP. Hồ Chí Minh." />
+  <meta property="og:title" content="Year End Party 2026 · Terumo BCT Việt Nam" />
+  <meta property="og:description" content="Chào Xuân Đinh Mùi 2027 — Tết ba miền về chung một nhà." />
+  <meta name="theme-color" content="#5a0f2a" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='34' r='22' fill='%23e8202e'/%3E%3Crect x='22' y='8' width='20' height='6' rx='2' fill='%23ffcf4a'/%3E%3Crect x='22' y='54' width='20' height='6' rx='2' fill='%23ffcf4a'/%3E%3C/svg%3E" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;600;800&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js" defer></script>
+  <script type="module" src="assets/js/main.js"></script>
+</head>
+<body>
+  <div id="loader" aria-hidden="true">
+    <div class="loader-lantern"></div>
+    <p>Đang treo đèn lồng, chuẩn bị pháo hoa…</p>
+  </div>
+
+  <canvas id="webgl" aria-hidden="true"></canvas>
+  <div class="progress"><span class="progress-bar"></span></div>
+
+  <header class="topbar">
+    <a class="brand" href="#top" data-scroll-to="#top">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span><strong data-bind="company">Terumo BCT Việt Nam</strong><small>YEP 2026</small></span>
+    </a>
+    <a class="btn btn-small" data-rsvp href="#">Đăng ký</a>
+  </header>
+
+  <nav class="journey-nav" aria-label="Hành trình">
+    <button data-go="0" class="is-active"><span>Đón Tết</span></button>
+    <button data-go="1"><span>Hà Nội</span></button>
+    <button data-go="2"><span>Huế</span></button>
+    <button data-go="3"><span>Đà Nẵng</span></button>
+    <button data-go="4"><span>Hội An</span></button>
+    <button data-go="5"><span>TP. HCM</span></button>
+    <button data-go="6"><span>Chương trình</span></button>
+    <button data-go="7"><span>Hẹn gặp</span></button>
+  </nav>
+
+  <main>
+    <!-- 0 · HERO -->
+    <section class="panel hero" id="top" data-step="0">
+      <p class="eyebrow" data-anim><span data-bind="company">Terumo BCT Việt Nam</span> trân trọng kính mời</p>
+      <h1 class="hero-title">
+        <span class="line">Year End Party</span>
+        <span class="line line-year">2026</span>
+      </h1>
+      <p class="script" data-anim data-bind="theme">Chào Xuân Đinh Mùi 2027</p>
+      <p class="lead" data-anim>Khép lại một năm 2026 rực rỡ, cùng nhau du xuân qua năm thành phố — mang Tết ba miền về chung một mái nhà.</p>
+      <ul class="chips" data-anim>
+        <li><b>Thời gian</b><span data-bind="partyDateLabel"></span></li>
+        <li><b>Địa điểm</b><span data-bind="venue"></span></li>
+      </ul>
+      <div class="actions" data-anim>
+        <a class="btn" data-rsvp href="#">Đăng ký tham dự</a>
+        <a class="btn btn-ghost" href="#ha-noi" data-scroll-to="#ha-noi">Bắt đầu hành trình</a>
+      </div>
+      <div class="scroll-hint" aria-hidden="true"><span></span>Cuộn để du xuân</div>
+    </section>
+
+    <!-- 1 · HÀ NỘI -->
+    <section class="panel city align-right" id="ha-noi" data-step="1">
+      <article class="card">
+        <span class="wish" aria-hidden="true">Phúc</span>
+        <p class="kicker" data-anim>01 · Miền Bắc</p>
+        <h2 data-anim>Hà Nội</h2>
+        <p class="sub" data-anim>Thủ đô ngàn năm văn hiến</p>
+        <p data-anim>Sắc đào Nhật Tân nhuộm hồng phố cổ, Tháp Rùa lung linh giữa Hồ Gươm, cầu Thê Húc đỏ thắm và ông đồ già cho chữ bên hè phố — một cái Tết đậm chất Hà thành.</p>
+        <ul class="tags" data-anim><li>Hồ Gươm</li><li>Tháp Rùa</li><li>Cầu Thê Húc</li><li>Hoa đào</li><li>Ông đồ</li></ul>
+      </article>
+    </section>
+
+    <!-- 2 · HUẾ -->
+    <section class="panel city align-left" id="hue" data-step="2">
+      <article class="card">
+        <span class="wish" aria-hidden="true">An</span>
+        <p class="kicker" data-anim>02 · Miền Trung</p>
+        <h2 data-anim>Huế</h2>
+        <p class="sub" data-anim>Cố đô trầm mặc</p>
+        <p data-anim>Ngọ Môn uy nghi rực rỡ đèn hoa, thuyền rồng lướt trên dòng Hương và tà áo dài tím mộng mơ — xuân về Huế mang nét trang nghiêm của chốn cung đình.</p>
+        <ul class="tags" data-anim><li>Ngọ Môn</li><li>Kỳ Đài</li><li>Sông Hương</li><li>Áo dài tím</li></ul>
+      </article>
+    </section>
+
+    <!-- 3 · ĐÀ NẴNG -->
+    <section class="panel city align-right" id="da-nang" data-step="3">
+      <article class="card">
+        <span class="wish" aria-hidden="true">Thịnh</span>
+        <p class="kicker" data-anim>03 · Miền Trung</p>
+        <h2 data-anim>Đà Nẵng</h2>
+        <p class="sub" data-anim>Thành phố đáng sống</p>
+        <p data-anim>Cầu Rồng vươn mình đổi sắc trên sông Hàn và phun lửa chào năm mới — như khí thế bứt phá mà chúng ta mang theo vào 2027.</p>
+        <ul class="tags" data-anim><li>Cầu Rồng</li><li>Sông Hàn</li><li>Rồng phun lửa</li></ul>
+      </article>
+    </section>
+
+    <!-- 4 · HỘI AN -->
+    <section class="panel city align-left" id="hoi-an" data-step="4">
+      <article class="card">
+        <span class="wish" aria-hidden="true">Lộc</span>
+        <p class="kicker" data-anim>04 · Miền Trung</p>
+        <h2 data-anim>Hội An</h2>
+        <p class="sub" data-anim>Phố cổ đèn lồng</p>
+        <p data-anim>Chùa Cầu cổ kính, những dãy nhà tường vàng và muôn ngàn đèn lồng sắc màu; hoa đăng thả trôi trên sông Hoài gửi gắm ước nguyện đầu xuân.</p>
+        <ul class="tags" data-anim><li>Chùa Cầu</li><li>Đèn lồng</li><li>Hoa đăng</li><li>Phố cổ</li></ul>
+      </article>
+    </section>
+
+    <!-- 5 · TP. HỒ CHÍ MINH -->
+    <section class="panel city align-right" id="tp-hcm" data-step="5">
+      <article class="card">
+        <span class="wish" aria-hidden="true">Phát</span>
+        <p class="kicker" data-anim>05 · Miền Nam</p>
+        <h2 data-anim>TP. Hồ Chí Minh</h2>
+        <p class="sub" data-anim>Thành phố không ngủ</p>
+        <p data-anim>Đường hoa Nguyễn Huệ rộn ràng sắc mai vàng, Landmark 81 và Bitexco bừng sáng, tiếng trống lân giòn giã khắp phố phường.</p>
+        <ul class="tags" data-anim><li>Landmark 81</li><li>Bitexco</li><li>Chợ Bến Thành</li><li>Đường hoa</li><li>Múa lân</li></ul>
+      </article>
+    </section>
+
+    <!-- 6 · CHƯƠNG TRÌNH -->
+    <section class="panel program align-left" id="chuong-trinh" data-step="6">
+      <article class="card agenda">
+        <p class="kicker" data-anim>06 · Đêm tiệc</p>
+        <h2 data-anim>Chương trình</h2>
+        <p class="sub" data-anim>Một đêm — Tết ba miền hội tụ</p>
+        <ol id="agenda-list" class="timeline"></ol>
+        <div id="spline-slot" class="spline-slot" hidden></div>
+      </article>
+    </section>
+
+    <!-- 7 · HẸN GẶP -->
+    <section class="panel rsvp" id="hen-gap" data-step="7">
+      <article class="card rsvp-card">
+        <p class="kicker" data-anim>07 · Hẹn gặp bạn</p>
+        <h2 data-anim>Đếm ngược đến đêm tiệc</h2>
+        <div class="countdown" data-anim role="timer" aria-live="off">
+          <div><b data-cd="d">00</b><span>Ngày</span></div>
+          <div><b data-cd="h">00</b><span>Giờ</span></div>
+          <div><b data-cd="m">00</b><span>Phút</span></div>
+          <div><b data-cd="s">00</b><span>Giây</span></div>
+        </div>
+        <p class="tet-note" id="tet-days" data-anim></p>
+        <dl class="details" data-anim>
+          <div><dt>Thời gian</dt><dd data-bind="partyDateLabel"></dd></div>
+          <div><dt>Địa điểm</dt><dd><span data-bind="venue"></span><br /><small data-bind="address"></small></dd></div>
+          <div><dt>Dress code</dt><dd data-bind="dressCode"></dd></div>
+          <div><dt>Chủ đề</dt><dd data-bind="theme"></dd></div>
+        </dl>
+        <div class="actions" data-anim>
+          <a class="btn" data-rsvp href="#">Đăng ký tham dự</a>
+          <a class="btn btn-ghost" id="add-calendar" download="YEP-2026-Terumo-BCT.ics" href="#">Thêm vào lịch</a>
+        </div>
+        <p class="wishline" data-anim>An Khang · Thịnh Vượng · Vạn Sự Như Ý</p>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>© 2026 <span data-bind="company"></span> · Year End Party 2026</p>
+    <p class="hint">Nhấp vào bầu trời để bắn pháo hoa ✦</p>
+  </footer>
+</body>
+</html>
