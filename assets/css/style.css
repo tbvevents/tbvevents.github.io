@@ -412,3 +412,30 @@ main { position: relative; z-index: 5; }
 @media (prefers-reduced-motion: reduce) {
   .loader-lantern, .scroll-hint span::after { animation: none; }
 }
+
+/* Nút bật/tắt nhạc nền */
+.music-toggle {
+  position: fixed;
+  left: var(--gutter);
+  bottom: 18px;
+  z-index: 15;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--gold);
+  background: var(--card);
+  color: var(--gold);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: transform 0.2s, background 0.3s, box-shadow 0.3s;
+}
+.music-toggle:hover { transform: scale(1.08); }
+.music-toggle:focus-visible { outline: 2px solid var(--gold-soft); outline-offset: 3px; }
+.music-toggle .ic-mute { opacity: 1; }
+.music-toggle.is-on { background: var(--red); color: var(--cream); box-shadow: 0 0 16px rgba(255, 207, 74, 0.55); animation: music-pulse 2.4s ease-in-out infinite; }
+.music-toggle.is-on .ic-mute { opacity: 0; }
+@keyframes music-pulse { 50% { box-shadow: 0 0 26px rgba(255, 207, 74, 0.85); } }
+@media (prefers-reduced-motion: reduce) { .music-toggle.is-on { animation: none; } }

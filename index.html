@@ -178,5 +178,17 @@
     <p>© 2026 <span data-bind="company"></span> · Year End Party 2026</p>
     <p class="hint">Nhấp vào bầu trời để bắn pháo hoa ✦</p>
   </footer>
+
+  <!-- Nhạc nền (không lời). Upload file vào assets/audio/ -->
+  <audio id="bgm" src="assets/audio/xuan-oi-xuan-da-ve.mp3" loop preload="none"></audio>
+  <button id="music-toggle" class="music-toggle" type="button" aria-pressed="false" aria-label="Bật nhạc nền" title="Bật/tắt nhạc nền">
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path class="ic-note" d="M9 18V5l11-2v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle class="ic-note" cx="6.5" cy="18" r="2.5" fill="currentColor"/>
+      <circle class="ic-note" cx="17.5" cy="16" r="2.5" fill="currentColor"/>
+      <path class="ic-mute" d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </button>
+  <script src="assets/js/music.js" defer></script>
 </body>
 </html>
