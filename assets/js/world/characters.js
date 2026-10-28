@@ -31,13 +31,75 @@ export function makeLiXi(scale = 1) {
   return g;
 }
 
+const hornMat = toon('#b8742c');
+const hornRingMat = toon('#7a4a1e');
+const hornHullMat = new THREE.MeshBasicMaterial({ color: 0x1b0b14, side: THREE.BackSide });
+const HORN_R0 = 0.105;
+const HORN_R1 = 0.012;
+const hornR = (t) => HORN_R0 + (HORN_R1 - HORN_R0) * Math.pow(t, 0.85);
+
+/** One smooth tapered tube along a curve. `grow` fattens it (used for the outline hull). */
+function taperedTube(points, grow = 0) {
+  const curve = new THREE.CatmullRomCurve3(points);
+  const tubular = 28;
+  const radial = 12;
+  const geo = new THREE.TubeGeometry(curve, tubular, 1, radial, false);
+  const pos = geo.attributes.position;
+  const nor = geo.attributes.normal;
+  const c = new THREE.Vector3();
+  const v = new THREE.Vector3();
+  for (let i = 0; i <= tubular; i++) {
+    const t = i / tubular;
+    curve.getPointAt(t, c);
+    const r = hornR(t) + grow;
+    for (let j = 0; j <= radial; j++) {
+      const k = i * (radial + 1) + j;
+      v.fromBufferAttribute(pos, k).sub(c).normalize();
+      nor.setXYZ(k, v.x, v.y, v.z);
+      pos.setXYZ(k, c.x + v.x * r, c.y + v.y * r, c.z + v.z * r);
+    }
+  }
+  pos.needsUpdate = true;
+  nor.needsUpdate = true;
+  return geo;
+}
+
+/** Goat horn: rises, sweeps outward then curls back, with ridge rings. sx = -1 (left) or 1 (right). */
+function makeHorn(sx) {
+  const pts = [[0, 0, 0], [0.07, 0.36, -0.03], [0.2, 0.68, -0.12], [0.42, 0.86, -0.28], [0.63, 0.85, -0.48]]
+    .map(([x, y, z]) => new THREE.Vector3(sx * x, y, z));
+  const horn = new THREE.Group();
+  const hull = new THREE.Mesh(taperedTube(pts, 0.028), hornHullMat);
+  const shaft = new THREE.Mesh(taperedTube(pts), hornMat);
+  hull.userData.noOutline = true;
+  shaft.userData.noOutline = true;
+  horn.add(hull, shaft);
+
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const p = new THREE.Vector3();
+  const tan = new THREE.Vector3();
+  const zAxis = new THREE.Vector3(0, 0, 1);
+  for (const t of [0.2, 0.38, 0.56, 0.72]) {
+    curve.getPointAt(t, p);
+    curve.getTangentAt(t, tan);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(hornR(t) * 1.03, 0.014, 6, 14), hornRingMat);
+    ring.position.copy(p);
+    ring.quaternion.setFromUnitVectors(zAxis, tan);
+    ring.userData.noOutline = true;
+    horn.add(ring);
+  }
+  return horn;
+}
+
 /** Linh vật Dê vàng — mascot of the year Đinh Mùi 2027. */
 export function makeGoat() {
   const g = new THREE.Group();
-  const fur = toon('#fff4e3');
+  const fur = toon('#f7cf63');
+  const furLight = toon('#fff0c4');
   const red = toon('#d7263d');
-  const horn = toon('#d49a45');
   const hoof = toon('#4a2b2b');
+  const pink = toon('#ff9fb0');
+  const black = toon('#1b0b14');
 
   const body = new THREE.Group();
   body.position.y = 0.7;
@@ -46,7 +108,7 @@ export function makeGoat() {
   body.add(mesh(new THREE.TorusGeometry(0.55, 0.08, 8, 24), glow('#ffcf4a', 1.3), { p: [0, 1.25, 0], r: [Math.PI / 2, 0, 0] }));
   for (let i = 0; i < 3; i++) body.add(mesh(box, glow('#ffcf4a', 1.2), { p: [0, 0.95 - i * 0.28, 0.78], s: 0.08, r: [0, 0, Math.PI / 4] }));
 
-  // legs
+  // legs + cloven hooves
   for (const sx of [-1, 1]) {
     const leg = mesh(cyl, fur, { p: [sx * 0.35, -0.2, 0], s: [0.2, 0.6, 0.2] });
     leg.add(mesh(cyl, hoof, { p: [0, -0.45, 0], s: [1.1, 0.25, 1.1] }));
@@ -68,24 +130,58 @@ export function makeGoat() {
   lixi.position.set(0, -0.9, 0.12);
   arms[1].add(lixi);
 
-  // head
+  // short upright tail
+  const tail = new THREE.Group();
+  tail.position.set(0, 0.5, -0.78);
+  tail.add(mesh(cone, fur, { p: [0, 0.14, 0], s: [0.11, 0.32, 0.11] }));
+  tail.rotation.x = -0.6;
+  body.add(tail);
+
+  // head: round cranium + long muzzle (what makes it read as a goat, not a bear)
   const head = new THREE.Group();
   head.position.set(0, 1.85, 0);
   body.add(head);
-  head.add(mesh(sphere, fur, { s: [0.68, 0.62, 0.62] }));
-  head.add(mesh(sphere, toon('#ffe6d2'), { p: [0, -0.2, 0.48], s: [0.36, 0.26, 0.26] }));
-  head.add(mesh(sphere, toon('#6b3a3a'), { p: [0, -0.1, 0.72], s: [0.08, 0.05, 0.04] }));
-  face(head, { y: 0.12, z: 0.55, spread: 0.24, eye: 0.09 });
-  head.add(mesh(cone, fur, { p: [0, -0.62, 0.3], r: [Math.PI, 0, 0], s: [0.12, 0.35, 0.12] })); // beard
+  head.add(mesh(sphere, fur, { s: [0.58, 0.64, 0.56] }));
+  head.add(mesh(sphere, furLight, { p: [0, -0.3, 0.44], s: [0.2, 0.32, 0.32] })); // long, narrow muzzle
+  head.add(mesh(sphere, toon('#6b4a4f'), { p: [0, -0.1, 0.73], s: [0.1, 0.065, 0.06] })); // small dark nose
+  head.add(mesh(box, black, { p: [0, -0.24, 0.76], s: [0.008, 0.06, 0.008] })); // philtrum
+  head.add(mesh(new THREE.TorusGeometry(0.08, 0.014, 6, 12, Math.PI * 0.9), black, { p: [0, -0.31, 0.7], r: [0, 0, Math.PI * 1.05] })); // smile
   for (const sx of [-1, 1]) {
-    head.add(mesh(sphere, fur, { p: [sx * 0.72, 0.05, 0], r: [0, 0, sx * -0.9], s: [0.12, 0.34, 0.1] }));
-    const h = mesh(new THREE.TorusGeometry(0.28, 0.08, 8, 16, Math.PI * 1.1), horn, {
-      p: [sx * 0.3, 0.55, -0.1],
-      r: [0, sx * Math.PI / 2, sx > 0 ? 0.4 : Math.PI - 0.4],
-    });
-    head.add(h);
+    head.add(mesh(sphere, black, { p: [sx * 0.04, -0.09, 0.785], s: [0.018, 0.026, 0.012] })); // nostril
+
+    // golden eye with a horizontal slit pupil
+    const eye = new THREE.Group();
+    eye.position.set(sx * 0.25, 0.12, 0.47);
+    eye.rotation.y = sx * 0.25;
+    eye.add(mesh(sphere, toon('#ffffff'), { s: [0.13, 0.14, 0.07] }));
+    eye.add(mesh(sphere, toon('#ffb100'), { p: [0, 0, 0.04], s: [0.095, 0.105, 0.05] }));
+    eye.add(mesh(box, black, { p: [0, 0, 0.088], s: [0.085, 0.032, 0.012] }));
+    eye.add(mesh(sphere, glow('#ffffff', 1), { p: [sx * -0.03, 0.04, 0.095], s: 0.02 }));
+    head.add(eye);
+
+    head.add(mesh(sphere, pink, { p: [sx * 0.34, -0.1, 0.42], r: [0, sx * 0.6, 0], s: [0.09, 0.055, 0.03] })); // blush
+    const horn = makeHorn(sx);
+    horn.position.set(sx * 0.24, 0.5, -0.02);
+    head.add(horn);
   }
-  body.add(mesh(sphere, fur, { p: [0, 0.6, -0.8], s: 0.18 })); // tail
+
+  // ears stick out sideways and flick
+  const ears = [];
+  for (const sx of [-1, 1]) {
+    const pivot = new THREE.Group();
+    pivot.position.set(sx * 0.54, 0.16, -0.04);
+    pivot.rotation.y = sx * 0.35;
+    const leaf = mesh(sphere, fur, { p: [sx * 0.26, 0, 0], s: [0.3, 0.13, 0.05] });
+    leaf.add(mesh(sphere, pink, { p: [0, 0, 0.7], s: [0.72, 0.62, 0.5] }));
+    pivot.add(leaf);
+    head.add(pivot);
+    ears.push(pivot);
+  }
+
+  for (const a of [-0.55, 0, 0.55]) { // forelock tuft
+    head.add(mesh(cone, furLight, { p: [Math.sin(a) * 0.1, 0.58 + Math.cos(a) * 0.04, 0.16], r: [0.7, 0, -a], s: [0.09, 0.2, 0.06] }));
+  }
+  head.add(mesh(cone, toon('#fffaf0'), { p: [0, -0.84, 0.72], r: [Math.PI - 0.3, 0, 0], s: [0.1, 0.5, 0.1] })); // goatee
 
   addOutline(g, 0.035);
   g.add(blobShadow(2.2));
@@ -97,6 +193,11 @@ export function makeGoat() {
     head.rotation.z = Math.sin(tt * 1.5) * 0.12;
     arms[1].rotation.z = 2.4 + Math.sin(tt * 6) * 0.35;
     arms[0].rotation.z = -0.4 - Math.sin(tt * 3) * 0.15;
+    ears.forEach((e, i) => {
+      const sx = i ? 1 : -1;
+      e.rotation.z = -sx * (0.3 + 0.1 * Math.sin(tt * 5 + i * 1.7));
+    });
+    tail.rotation.z = Math.sin(tt * 8) * 0.3;
   };
   return g;
 }
