@@ -7,9 +7,10 @@
 //  - không rơi vào nút/liên kết/thẻ nội dung,
 //  - và nằm ở nửa trên của khung nhìn (skyRatio).
 // Bắn ở lúc NHẢ tay (pointerup): đây cũng là thời điểm trình duyệt di động cho phép phát âm thanh.
-const INTERACTIVE = 'a, button, input, textarea, select, label, summary, [role="button"], [contenteditable], .card, nav, header, footer, .music-toggle';
+import { t } from './i18n.js';
+
+const INTERACTIVE = 'a, button, input, textarea, select, label, summary, [role="button"], [contenteditable], .card, nav, header, footer, .music-toggle, .lang-toggle';
 const MAX_TAP_MS = 700;
-const HINT_TEXT = 'Chạm vào bầu trời (nửa trên màn hình) để bắn pháo hoa ✦';
 
 export function initSkyTap({ onSky, skyRatio = 0.5, cooldown = 140 } = {}) {
   const root = document.documentElement;
@@ -39,9 +40,9 @@ export function initSkyTap({ onSky, skyRatio = 0.5, cooldown = 140 } = {}) {
       hintEl = document.createElement('div');
       hintEl.className = 'sky-hint';
       hintEl.setAttribute('role', 'status');
-      hintEl.textContent = HINT_TEXT;
       document.body.appendChild(hintEl);
     }
+    hintEl.textContent = t('sky.hint');
     requestAnimationFrame(() => hintEl.classList.add('is-on'));
     clearTimeout(hintTimer);
     hintTimer = setTimeout(() => hintEl.classList.remove('is-on'), 2800);

@@ -20,12 +20,26 @@ GitHub Pages phục vụ trực tiếp từ nhánh `main` (file `.nojekyll` đã
 Tất cả thông tin sự kiện nằm trong [`assets/js/config.js`](assets/js/config.js): ngày giờ, địa điểm, dress code, link form đăng ký, chương trình, và (tuỳ chọn) URL scene Spline.
 Các giá trị đánh dấu `TODO` là giá trị tạm, cần thay bằng thông tin chính thức.
 
+## Ngôn ngữ Tiếng Việt / English
+
+Nút **VI | EN** nhỏ, mờ ở góc dưới bên phải (cả landing page lẫn trang mini game). Lựa chọn được nhớ trên máy người dùng (`localStorage`), dùng chung hai trang; thêm `?lang=en` hoặc `?lang=vi` vào URL để ép ngôn ngữ (ví dụ link gửi khách nước ngoài). Mặc định là Tiếng Việt. Họ tên người chơi, MSNV, email luôn giữ nguyên. Trang `admin.html` chỉ có Tiếng Việt.
+
+| Chỗ cần sửa chữ | Ở đâu |
+| --- | --- |
+| Thông tin sự kiện, chương trình, luật chơi (config) | [`assets/js/config.js`](assets/js/config.js): các giá trị dạng `{ vi: '…', en: '…' }` (chuỗi thường thì dùng cho cả hai ngôn ngữ) |
+| Mọi chữ khác trên giao diện (thẻ, nút, thông báo, 3D...) | [`assets/js/i18n-strings.js`](assets/js/i18n-strings.js): `'khoá': ['Tiếng Việt', 'English']`, `{tên}` là chỗ điền giá trị |
+| Câu hỏi Đố vui | [`assets/js/minigame/quiz-bank.js`](assets/js/minigame/quiz-bank.js): mỗi câu có thêm `en: { q, o }` (đáp án đúng cũng ở đầu); thiếu `en` thì bản EN hiện tiếng Việt |
+| Tên biểu tượng game Lật thẻ | `SYMBOLS` trong `assets/js/minigame/memory.js` (`[icon, vi, en]`) |
+
+Trong HTML dùng `data-i18n="khoá"` (văn bản), `data-i18n-html` (có thẻ `<b>`), `data-i18n-list` (`a|b|c` thành danh sách) và `data-i18n-attr="aria-label:khoá"`. Trong JS dùng `t('khoá')`, `L(giá trị {vi,en})` và `onLangChange(cb)` để vẽ lại chữ do JS tạo ra. Chữ vẽ lên canvas 3D tự vẽ lại khi đổi ngôn ngữ. Khoá thiếu bản dịch sẽ báo trong console (`[i18n] thiếu key`).
+
 ## Cấu trúc
 
 | File | Nội dung |
 | --- | --- |
 | `index.html` | Các section nội dung (mỗi `data-step` = một điểm dừng camera) |
 | `assets/css/style.css` | Giao diện thẻ, typography, responsive |
+| `assets/js/i18n.js`, `i18n-strings.js` | Chuyển ngôn ngữ VI/EN, kho chuỗi dịch |
 | `assets/js/main.js` | Renderer, bloom, camera chạy theo scroll (GSAP ScrollTrigger), pháo hoa tự động/nhấp chuột |
 | `assets/js/world/cities.js` | Mô hình low-poly: Tháp Rùa, Ngọ Môn, Cầu Rồng, Chùa Cầu, Landmark 81, Bitexco, Bến Thành, sân khấu |
 | `assets/js/world/characters.js` | Linh vật Dê vàng, em bé áo dài, ông đồ, múa lân, đèn lồng |
@@ -71,7 +85,7 @@ Sửa `GAMES` trong `config.js` **và** các hàm `gameOpen()`, `maxScore()`, `m
 ### Đố vui: kho câu hỏi và giới hạn lượt
 
 - Kho ~155 câu chia 10 chủ đề nằm trong [`assets/js/minigame/quiz-bank.js`](assets/js/minigame/quiz-bank.js) (đáp án đúng luôn ở vị trí đầu tiên).
-  Mỗi lượt bốc 10 câu, mỗi chủ đề một câu, ưu tiên câu người chơi chưa gặp trên máy đó.
+  Mỗi lượt bốc 10 câu, mỗi chủ đề một câu, ưu tiên câu người chơi chưa gặp trên máy đó. Mỗi câu có sẵn bản tiếng Anh (`en`); khi thêm câu mới nên thêm luôn `en`.
 - BTC duyệt toàn bộ kho ở `admin.html` → mục *Ngân hàng câu hỏi* (đáp án đúng tô xanh, xuất CSV được). Sửa câu thì sửa file trên rồi push.
 - Mỗi người chơi Đố vui tối đa **3 lượt/ngày** (giờ VN). Máy chủ (Firestore rules) đếm, lượt được tính ngay khi bắt đầu.
 

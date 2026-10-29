@@ -2,6 +2,7 @@
 // Every factory returns a THREE.Group whose userData.update(t) animates it.
 import * as THREE from 'three';
 import { toon, glow, mesh, addOutline, blobShadow, textTexture } from './toon.js';
+import { t, getLang } from '../i18n.js';
 
 const SKIN = '#ffd9b8';
 const sphere = new THREE.SphereGeometry(1, 24, 16);
@@ -252,7 +253,7 @@ export function makeKid({ ao = '#e63946', quan = '#ffffff', hair = '#2b1a12', ha
     lan.position.set(0, -0.95, 0.7);
     hand.add(lan);
   } else if (prop === 'scroll') {
-    const tex = textTexture('Phúc Lộc');
+    const tex = textTexture(() => t('scene.scroll'), { font: () => `bold ${getLang() === 'en' ? 76 : 120}px "Playfair Display", serif` });
     hand.add(mesh(new THREE.PlaneGeometry(0.5, 1), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }), { p: [0, -0.9, 0.2] }));
   } else if (prop === 'flag') {
     hand.add(mesh(cyl, toon('#7a4a1a'), { p: [0, -0.4, 0.1], s: [0.025, 1.4, 0.025] }));

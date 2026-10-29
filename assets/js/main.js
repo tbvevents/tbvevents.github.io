@@ -7,6 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { EVENT, AGENDA } from './config.js';
+import { L, t, tn, getLang, onLangChange } from './i18n.js';
 import * as City from './world/cities.js';
 import { FOG_COLOR, createSky, createGround, createHorizonHaze, Petals, SkyLanterns, createJourneyPath } from './world/decor.js';
 import { Fireworks } from './world/fireworks.js';
@@ -270,15 +271,30 @@ function playIntroText() {
   gsap.from('.hero-title .char', { yPercent: 110, rotate: 8, autoAlpha: 0, duration: 1, stagger: 0.035, ease: 'back.out(1.6)', delay: 0.5 });
 }
 
-function fillContent() {
-  document.querySelectorAll('[data-bind]').forEach((el) => (el.textContent = EVENT[el.dataset.bind] ?? ''));
+/** Chữ lấy từ config.js (theo ngôn ngữ hiện tại). Gọi lại mỗi khi đổi ngôn ngữ. Danh sách chương trình chỉ cập nhật chữ, không dựng lại thẻ, để giữ hiệu ứng cuộn. */
+function bindContent() {
+  document.querySelectorAll('[data-bind]').forEach((el) => (el.textContent = L(EVENT[el.dataset.bind]) ?? ''));
 
   const list = document.getElementById('agenda-list');
-  list.innerHTML = AGENDA.map((a) => `
-    <li data-anim>
-      <time>${a.time}</time>
-      <div><h3>${a.title}</h3><p>${a.desc}</p></div>
-    </li>`).join('');
+  if (list.children.length !== AGENDA.length) {
+    list.innerHTML = AGENDA.map(() => '<li data-anim><time></time><div><h3></h3><p></p></div></li>').join('');
+  }
+  AGENDA.forEach((a, i) => {
+    const li = list.children[i];
+    li.querySelector('time').textContent = a.time;
+    li.querySelector('h3').textContent = L(a.title);
+    li.querySelector('p').textContent = L(a.desc);
+  });
+
+  if (!EVENT.rsvpUrl) document.querySelectorAll('[data-rsvp]').forEach((a) => { a.title = t('register.soon'); });
+
+  const ics = document.getElementById('add-calendar');
+  if (ics) ics.href = icsLink();
+}
+
+function fillContent() {
+  bindContent();
+  onLangChange(bindContent);
 
   document.querySelectorAll('[data-rsvp]').forEach((a) => {
     if (EVENT.rsvpUrl) {
@@ -289,12 +305,8 @@ function fillContent() {
       a.removeAttribute('href');
       a.classList.add('is-disabled');
       a.setAttribute('aria-disabled', 'true');
-      a.title = 'Form đăng ký sẽ được mở sớm';
     }
   });
-
-  const ics = document.getElementById('add-calendar');
-  if (ics) ics.href = icsLink();
 
   if (EVENT.splineScene) {
     const s = document.createElement('script');
@@ -321,11 +333,11 @@ function icsLink() {
   const end = new Date(start.getTime() + 5 * 3600 * 1000);
   const fmt = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const body = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Terumo BCT Viet Nam//YEP 2026//VI', 'BEGIN:VEVENT',
+    'BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//Terumo BCT Viet Nam//YEP 2026//${getLang().toUpperCase()}`, 'BEGIN:VEVENT',
     `UID:yep2026-${fmt(start)}@tbvevents.github.io`, `DTSTAMP:${fmt(new Date())}`,
     `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
-    `SUMMARY:${EVENT.name} · ${EVENT.company}`, `LOCATION:${EVENT.venue} - ${EVENT.address}`,
-    `DESCRIPTION:${EVENT.theme}. Dress code: ${EVENT.dressCode}`, 'END:VEVENT', 'END:VCALENDAR',
+    `SUMMARY:${EVENT.name} · ${L(EVENT.company)}`, `LOCATION:${L(EVENT.venue)} - ${L(EVENT.address)}`,
+    `DESCRIPTION:${L(EVENT.theme)}. ${t('ics.dress')}: ${L(EVENT.dressCode)}`, 'END:VEVENT', 'END:VCALENDAR',
   ].join('\r\n');
   return 'data:text/calendar;charset=utf-8,' + encodeURIComponent(body);
 }
@@ -345,10 +357,11 @@ function startCountdown() {
     els.s.textContent = pad(Math.floor(left / 1e3) % 60);
     if (left === 0) document.querySelector('.countdown')?.classList.add('is-live');
     const tetDays = Math.ceil((tet - now) / 864e5);
-    tetEl.textContent = tetDays > 0 ? `Còn ${tetDays} ngày nữa là Tết Đinh Mùi 2027` : 'Chúc Mừng Năm Mới Đinh Mùi 2027!';
+    tetEl.textContent = tetDays > 0 ? tn('tet.left', tetDays) : t('tet.now');
   };
   tick();
   setInterval(tick, 1000);
+  onLangChange(tick); // đổi ngôn ngữ thì cập nhật dòng "Còn … ngày" ngay, không chờ giây kế tiếp
 }
 
 function setupUI() {

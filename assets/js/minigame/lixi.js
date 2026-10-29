@@ -2,6 +2,7 @@
 // Số vật rơi cố định (40 bao đỏ +1, 8 bao vàng +3, 14 quả pháo −2) nên điểm tối đa đúng bằng 64,
 // khớp với trần điểm trong firestore.rules.
 import * as sfx from './sounds.js';
+import { t } from '../i18n.js';
 
 const DURATION = 30;
 const KINDS = {
@@ -14,7 +15,7 @@ export function play(stage, hud, signal) {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas');
     canvas.className = 'lixi-canvas';
-    canvas.setAttribute('aria-label', 'Khu vực chơi Hứng lì xì: kéo ngón tay hoặc dùng phím mũi tên để di chuyển giỏ');
+    canvas.setAttribute('aria-label', t('lixi.aria'));
     stage.appendChild(canvas);
     const ctx = canvas.getContext('2d');
 

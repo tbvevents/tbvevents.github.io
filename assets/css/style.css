@@ -416,7 +416,7 @@ main { position: relative; z-index: 5; }
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px;
-  padding: 24px var(--gutter) 32px;
+  padding: 24px var(--gutter) calc(72px + env(safe-area-inset-bottom, 0px));
   font-size: 13px;
   color: rgba(255, 246, 230, 0.7);
 }
@@ -516,3 +516,46 @@ html.sky-hover { cursor: crosshair; }
   .sky-ripple { animation-duration: 0.01s; }
   .sky-hint { transition: none; }
 }
+
+/* Nút chọn ngôn ngữ VI | EN — nhỏ, mờ, góc dưới bên phải */
+.lang-toggle {
+  position: fixed;
+  right: max(var(--gutter), env(safe-area-inset-right, 0px));
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: 15;
+  display: flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  backdrop-filter: blur(6px);
+  opacity: 0.5;
+  transition: opacity 0.25s;
+}
+.lang-toggle:hover,
+.lang-toggle:focus-within { opacity: 0.95; }
+.lang-toggle button {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gold-soft);
+  font: 700 11px/1 var(--sans);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.lang-toggle button.is-on { background: var(--gold); color: var(--ink); }
+.lang-toggle button:focus-visible { outline: 2px solid var(--gold-soft); outline-offset: 1px; }
+/* đang chơi game: ẩn để không che vùng chơi và không đổi ngôn ngữ giữa câu hỏi */
+.is-playing .lang-toggle { display: none; }
+/* Người dùng đã chọn EN: giấu trang đến khi chữ đã đổi xong, tránh nháy tiếng Việt. Tự hiện lại sau 1,2 giây nếu JS lỗi. */
+html[data-lang="en"]:not(.i18n-ready) body { visibility: hidden; animation: i18n-reveal 0s 1.2s forwards; }
+@keyframes i18n-reveal { to { visibility: visible; } }
+/* bản đặt trong hộp thoại (modal che mất nút nổi) */
+.lang-toggle--inline { position: static; opacity: 0.85; z-index: auto; flex: none; }
+.lang-toggle--inline button { min-width: 30px; height: 26px; padding: 0 6px; }
+.is-playing .lang-toggle--inline { display: flex; }

@@ -1,6 +1,8 @@
 // Nhạc nền: "Xuân ơi xuân đã về" (không lời).
 // Trình duyệt chặn tự phát, nên nhạc bắt đầu ở lần chạm/click/phím đầu tiên.
 // Đổi file nhạc: sửa thuộc tính src của <audio id="bgm"> trong index.html.
+import { t, onLangChange } from './i18n.js';
+
 (() => {
   const audio = document.getElementById('bgm');
   const btn = document.getElementById('music-toggle');
@@ -15,8 +17,9 @@
     const on = !audio.paused;
     btn.classList.toggle('is-on', on);
     btn.setAttribute('aria-pressed', String(on));
-    btn.setAttribute('aria-label', on ? 'Tắt nhạc nền' : 'Bật nhạc nền');
+    btn.setAttribute('aria-label', t(on ? 'music.off' : 'music.on'));
   };
+  onLangChange(render);
 
   const fadeTo = (to, ms, done) => {
     clearInterval(fadeTimer);

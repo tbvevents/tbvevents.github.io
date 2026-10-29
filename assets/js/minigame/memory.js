@@ -2,11 +2,14 @@
 // Hoàn thành: 100 − 2 điểm mỗi lượt lật thừa (quá 12 lượt) − 1 điểm mỗi giây quá 30 giây, tối thiểu 20.
 // Hết giờ chưa xong: 4 điểm mỗi cặp đã ghép.
 import * as sfx from './sounds.js';
+import { t, getLang } from '../i18n.js';
 
+// [biểu tượng, tên tiếng Việt, tên tiếng Anh] — tên dùng cho trình đọc màn hình
 const SYMBOLS = [
-  ['🌸', 'Hoa đào'], ['🌼', 'Hoa mai'], ['🧧', 'Lì xì'], ['🏮', 'Đèn lồng'],
-  ['🐐', 'Dê vàng'], ['🎆', 'Pháo hoa'], ['🐉', 'Rồng'], ['🍊', 'Quả quýt'],
+  ['🌸', 'Hoa đào', 'Peach blossom'], ['🌼', 'Hoa mai', 'Apricot blossom'], ['🧧', 'Lì xì', 'Lucky money'], ['🏮', 'Đèn lồng', 'Lantern'],
+  ['🐐', 'Dê vàng', 'Golden goat'], ['🎆', 'Pháo hoa', 'Fireworks'], ['🐉', 'Rồng', 'Dragon'], ['🍊', 'Quả quýt', 'Tangerine'],
 ];
+const labelOf = (sym) => (getLang() === 'en' ? sym[2] : sym[1]);
 const LIMIT = 90;
 const FREE_MOVES = 12;
 const FREE_SECONDS = 30;
@@ -20,8 +23,8 @@ export function play(stage, hud, signal) {
 
     const grid = document.createElement('div');
     grid.className = 'memory';
-    grid.innerHTML = deck.map(([icon, label], i) => `
-      <button type="button" class="mem-card" data-i="${i}" aria-label="Thẻ ${i + 1}, úp">
+    grid.innerHTML = deck.map(([icon], i) => `
+      <button type="button" class="mem-card" data-i="${i}" aria-label="${t('mem.down', { i: i + 1 })}">
         <span class="mem-face mem-back" aria-hidden="true"></span>
         <span class="mem-face mem-front" aria-hidden="true">${icon}</span>
       </button>`).join('');
@@ -72,7 +75,7 @@ export function play(stage, hud, signal) {
       if (!card || busy || card.classList.contains('is-open')) return;
       const i = +card.dataset.i;
       card.classList.add('is-open');
-      card.setAttribute('aria-label', `Thẻ ${i + 1}, ${deck[i][1]}`);
+      card.setAttribute('aria-label', t('mem.up', { i: i + 1, label: labelOf(deck[i]) }));
       sfx.flip();
       open.push(card);
       if (open.length < 2) return;
@@ -94,7 +97,7 @@ export function play(stage, hud, signal) {
         flipBack = setTimeout(() => {
           for (const c of [a, b]) {
             c.classList.remove('is-open');
-            c.setAttribute('aria-label', `Thẻ ${+c.dataset.i + 1}, úp`);
+            c.setAttribute('aria-label', t('mem.down', { i: +c.dataset.i + 1 }));
           }
           busy = false;
         }, 750);

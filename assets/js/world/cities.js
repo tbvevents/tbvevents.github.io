@@ -1,7 +1,9 @@
 // Stylised, low-poly landmarks of Việt Nam's big cities, each on its own Tết diorama island.
 // Every builder returns a Group built facing +z; main.js turns it towards its camera keyframe.
 import * as THREE from 'three';
-import { toon, glow, mesh, rand, pick, textTexture } from './toon.js';
+import { toon, glow, mesh, rand, pick, textTexture, liveTexture } from './toon.js';
+import { EVENT } from '../config.js';
+import { t, L } from '../i18n.js';
 import { makeGoat, makeKid, makeLion, makeLantern } from './characters.js';
 import { cityBase, water, makeBlossomTree, makePot, makeBanhChung, makeFirecrackers } from './decor.js';
 
@@ -375,7 +377,7 @@ export function buildHCM() {
   const gate = new THREE.Group();
   for (const sx of [-1, 1]) gate.add(mesh(box, toon('#c8102e'), { s: [0.8, 7, 0.8], p: [sx * 7, 3.5, 0] }));
   const sign = mesh(new THREE.PlaneGeometry(14, 1.8), new THREE.MeshBasicMaterial({
-    map: textTexture('CHÚC MỪNG NĂM MỚI 2027', { w: 1400, h: 180, vertical: false, font: 'bold 92px "Playfair Display", serif' }),
+    map: textTexture(() => t('scene.sign'), { w: 1400, h: 180, vertical: false, font: 'bold 92px "Playfair Display", serif' }),
     toneMapped: false,
     side: THREE.DoubleSide,
   }), { p: [0, 6.3, 0] });
@@ -448,41 +450,36 @@ export function buildStage() {
 }
 
 function stageTexture() {
-  const c = document.createElement('canvas');
-  c.width = 2000;
-  c.height = 900;
-  const g = c.getContext('2d');
-  const grd = g.createLinearGradient(0, 0, 0, 900);
-  grd.addColorStop(0, '#7a0f2a');
-  grd.addColorStop(1, '#2a0820');
-  g.fillStyle = grd;
-  g.fillRect(0, 0, 2000, 900);
-  // golden sun-burst rays
-  g.save();
-  g.translate(1000, 520);
-  for (let i = 0; i < 36; i++) {
-    g.rotate((Math.PI * 2) / 36);
-    g.fillStyle = i % 2 ? 'rgba(255,207,74,0.08)' : 'rgba(255,207,74,0.02)';
-    g.beginPath();
-    g.moveTo(0, 0);
-    g.lineTo(1400, -60);
-    g.lineTo(1400, 60);
-    g.fill();
-  }
-  g.restore();
-  g.textAlign = 'center';
-  g.fillStyle = '#ffd76a';
-  g.font = '600 64px "Be Vietnam Pro", sans-serif';
-  g.fillText('TERUMO BCT VIỆT NAM', 1000, 170);
-  g.font = 'bold 190px "Playfair Display", serif';
-  g.fillText('YEAR END PARTY', 1000, 390);
-  g.font = 'bold 230px "Playfair Display", serif';
-  g.fillStyle = '#ffffff';
-  g.fillText('2026', 1000, 620);
-  g.font = 'italic 70px "Playfair Display", serif';
-  g.fillStyle = '#ffd76a';
-  g.fillText('Chào Xuân Đinh Mùi 2027', 1000, 780);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  return liveTexture(2000, 900, (g) => {
+    const grd = g.createLinearGradient(0, 0, 0, 900);
+    grd.addColorStop(0, '#7a0f2a');
+    grd.addColorStop(1, '#2a0820');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 2000, 900);
+    // golden sun-burst rays
+    g.save();
+    g.translate(1000, 520);
+    for (let i = 0; i < 36; i++) {
+      g.rotate((Math.PI * 2) / 36);
+      g.fillStyle = i % 2 ? 'rgba(255,207,74,0.08)' : 'rgba(255,207,74,0.02)';
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.lineTo(1400, -60);
+      g.lineTo(1400, 60);
+      g.fill();
+    }
+    g.restore();
+    g.textAlign = 'center';
+    g.fillStyle = '#ffd76a';
+    g.font = '600 64px "Be Vietnam Pro", sans-serif';
+    g.fillText(L(EVENT.company).toUpperCase(), 1000, 170);
+    g.font = 'bold 190px "Playfair Display", serif';
+    g.fillText('YEAR END PARTY', 1000, 390);
+    g.font = 'bold 230px "Playfair Display", serif';
+    g.fillStyle = '#ffffff';
+    g.fillText('2026', 1000, 620);
+    g.font = 'italic 70px "Playfair Display", serif';
+    g.fillStyle = '#ffd76a';
+    g.fillText(L(EVENT.theme), 1000, 780);
+  });
 }

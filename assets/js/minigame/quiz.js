@@ -1,8 +1,10 @@
 // Đố vui Tết ba miền: 10 câu mỗi lượt, mỗi câu 15 giây.
 // Đúng = 5 điểm + thưởng tốc độ tối đa 5 (trả lời trong 3 giây đầu) → tối đa 100.
 // Câu hỏi nằm trong quiz-bank.js. Mỗi lượt bốc câu dàn đều qua các chủ đề, ưu tiên câu người chơi chưa gặp.
+// Mỗi câu có bản tiếng Việt (q, o) và tiếng Anh (en: { q, o }); câu đã gặp luôn được nhớ theo bản tiếng Việt nên đổi ngôn ngữ không làm lặp câu.
 import * as sfx from './sounds.js';
 import { BANK } from './quiz-bank.js';
+import { t, getLang } from '../i18n.js';
 
 const COUNT = 10;
 const PER_Q = 15;
@@ -82,11 +84,12 @@ export function play(stage, hud, signal) {
         resolve(score);
         return;
       }
-      const { q, o } = picked[idx];
+      const item = picked[idx];
+      const { q, o } = (getLang() === 'en' && item.en) || item;
       const correct = o[0];
       const opts = shuffle([...o]);
       box.innerHTML = `
-        <p class="quiz-count">Câu ${idx + 1}/${COUNT}</p>
+        <p class="quiz-count">${t('quiz.count', { i: idx + 1, n: COUNT })}</p>
         <div class="quiz-bar"><span></span></div>
         <h3 class="quiz-q"></h3>
         <div class="quiz-opts">${opts.map(() => '<button type="button" class="quiz-opt"></button>').join('')}</div>`;

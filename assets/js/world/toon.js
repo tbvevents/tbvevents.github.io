@@ -1,5 +1,6 @@
 // Shared helpers for the cartoon (toon-shaded) look of the whole world.
 import * as THREE from 'three';
+import { L, onLangChange } from '../i18n.js';
 
 const tones = new Uint8Array([70, 150, 230, 255]);
 export const gradientMap = new THREE.DataTexture(tones, tones.length, 1, THREE.RedFormat);
@@ -68,30 +69,52 @@ export function blobShadow(size = 1.6) {
   return mesh(shadowGeo, shadowMat, { p: [0, 0.03, 0], r: [-Math.PI / 2, 0, 0], s: [size, size, 1] });
 }
 
-/** Canvas texture with text: used for calligraphy scrolls and signs. */
-export function textTexture(text, { w = 256, h = 512, bg = '#c8102e', fg = '#ffd76a', font = 'bold 120px "Playfair Display", serif', vertical = true } = {}) {
+/**
+ * Canvas texture tự vẽ lại khi đổi ngôn ngữ. `draw(ctx, w, h)` được gọi lúc tạo và mỗi lần đổi ngôn ngữ,
+ * nên bên trong có thể dùng t() / L() để lấy chữ theo ngôn ngữ hiện tại.
+ */
+export function liveTexture(w, h, draw) {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
   const g = c.getContext('2d');
-  g.fillStyle = bg;
-  g.fillRect(0, 0, w, h);
-  g.strokeStyle = fg;
-  g.lineWidth = 6;
-  g.strokeRect(12, 12, w - 24, h - 24);
-  g.fillStyle = fg;
-  g.font = font;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  if (vertical) {
-    const words = text.split(' ');
-    words.forEach((word, i) => g.fillText(word, w / 2, (h / (words.length + 1)) * (i + 1)));
-  } else {
-    g.fillText(text, w / 2, h / 2);
-  }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  const paint = () => {
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, w, h);
+    draw(g, w, h);
+    tex.needsUpdate = true;
+  };
+  paint();
+  onLangChange(paint);
   return tex;
+}
+
+/**
+ * Canvas texture with text: used for calligraphy scrolls and signs.
+ * `text` và `font` có thể là chuỗi, { vi, en } hoặc hàm () => chuỗi (chạy lại mỗi lần đổi ngôn ngữ).
+ */
+export function textTexture(text, { w = 256, h = 512, bg = '#c8102e', fg = '#ffd76a', font = 'bold 120px "Playfair Display", serif', vertical = true } = {}) {
+  const pick = (v) => (typeof v === 'function' ? v() : L(v));
+  return liveTexture(w, h, (g) => {
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = fg;
+    g.lineWidth = 6;
+    g.strokeRect(12, 12, w - 24, h - 24);
+    g.fillStyle = fg;
+    g.font = pick(font);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    const str = pick(text);
+    if (vertical) {
+      const words = str.split(' ');
+      words.forEach((word, i) => g.fillText(word, w / 2, (h / (words.length + 1)) * (i + 1)));
+    } else {
+      g.fillText(str, w / 2, h / 2);
+    }
+  });
 }
 
 export const rand = (a, b) => a + Math.random() * (b - a);

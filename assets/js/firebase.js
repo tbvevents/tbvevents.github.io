@@ -27,11 +27,11 @@ export function watchTop10(cb, onError) {
   return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ uid: d.id, ...d.data() }))), onError);
 }
 
-/** Vẽ Top 10 vào một <ol>. */
-export function renderTop10(ol, rows) {
+/** Vẽ Top 10 vào một <ol>. `emptyText`: chữ hiển thị khi chưa có ai ghi điểm (do nơi gọi dịch). */
+export function renderTop10(ol, rows, emptyText = 'Chưa có ai ghi điểm — hãy là người đầu tiên!') {
   const me = myMsnv();
   if (!rows.length) {
-    ol.innerHTML = '<li class="lb-empty">Chưa có ai ghi điểm — hãy là người đầu tiên!</li>';
+    ol.innerHTML = `<li class="lb-empty">${esc(emptyText)}</li>`;
     return;
   }
   ol.innerHTML = rows.map((r, i) => `

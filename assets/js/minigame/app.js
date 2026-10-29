@@ -1,5 +1,6 @@
 // Trang mini game: đăng nhập Gmail → nhập MSNV → chọn game → nộp điểm.
 import { GAMES } from '../config.js';
+import { L, t, tn, onLangChange } from '../i18n.js';
 import { isConfigured } from '../firebase.js';
 import * as sfx from './sounds.js';
 
@@ -53,7 +54,7 @@ async function start() {
   let playing = null;
   let rankedTotal = -1;
 
-  $('#close-label').textContent = GAMES.closeLabel;
+  $('#close-label').textContent = L(GAMES.closeLabel);
   if (inAppBrowser) $('#inapp-warn').hidden = false;
 
   /* ── đăng nhập ── */
@@ -62,9 +63,9 @@ async function start() {
       await api.signIn();
     } catch (err) {
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
-      if (err.code === 'auth/popup-blocked') toast('Trình duyệt chặn cửa sổ đăng nhập. Hãy cho phép popup rồi thử lại.');
-      else if (err.code === 'auth/unauthorized-domain') toast('Tên miền chưa được cấp phép trong Firebase Authentication.');
-      else toast('Đăng nhập không thành công. Vui lòng thử lại.');
+      if (err.code === 'auth/popup-blocked') toast(t('mg.toast.popup'));
+      else if (err.code === 'auth/unauthorized-domain') toast(t('mg.toast.domain'));
+      else toast(t('mg.toast.loginFail'));
       console.warn(err);
     }
   }
@@ -89,7 +90,7 @@ async function start() {
       profile = await api.getProfile(user.uid);
     } catch (err) {
       console.warn(err);
-      toast('Không tải được hồ sơ. Kiểm tra kết nối mạng.');
+      toast(t('mg.toast.profile'));
       return;
     }
     if (!profile) {
@@ -117,8 +118,8 @@ async function start() {
     btn.disabled = true;
     try {
       const emp = await api.lookupEmployee(msnv);
-      if (!emp) toast(`Không tìm thấy MSNV ${msnv} trong danh sách. Kiểm tra lại hoặc liên hệ BTC.`);
-      else if (emp.claimed) toast(`MSNV ${msnv} đã được liên kết với một Gmail khác. Vui lòng liên hệ BTC.`);
+      if (!emp) toast(t('mg.toast.msnvNotFound', { msnv }));
+      else if (emp.claimed) toast(t('mg.toast.msnvClaimed', { msnv }));
       else {
         pendingMsnv = msnv;
         $('#confirm-name').textContent = emp.name;
@@ -128,7 +129,7 @@ async function start() {
       }
     } catch (err) {
       console.warn(err);
-      toast('Không kiểm tra được MSNV. Vui lòng thử lại.');
+      toast(t('mg.toast.msnvCheckFail'));
     } finally {
       btn.disabled = false;
     }
@@ -144,7 +145,7 @@ async function start() {
       enterLobby(api.auth.currentUser.uid);
     } catch (err) {
       console.warn(err);
-      toast('Không liên kết được MSNV (có thể vừa có người khác nhận). Vui lòng liên hệ BTC.');
+      toast(t('mg.toast.claimFail'));
       resetClaim();
     } finally {
       btn.disabled = false;
@@ -167,24 +168,22 @@ async function start() {
     $('#me-total').textContent = score.total;
     const open = isOpen();
     $('#closed-note').hidden = open;
-    $('#closed-note').textContent = now() < Date.parse(GAMES.openAt)
-      ? 'Mini game chưa mở. Hẹn bạn quay lại sớm!'
-      : 'Đã hết thời gian tính điểm. Cảm ơn bạn đã tham gia!';
+    $('#closed-note').textContent = t(now() < Date.parse(GAMES.openAt) ? 'mg.closed.notOpen' : 'mg.closed.ended');
     if (score.banned) {
       $('#closed-note').hidden = false;
-      $('#closed-note').textContent = 'Kết quả của bạn đang được BTC xem xét. Vui lòng liên hệ BTC.';
+      $('#closed-note').textContent = t('mg.closed.banned');
     }
     const quizLeft = api.quizPlaysLeft(score);
     $('#game-list').innerHTML = GAMES.list.map((g) => {
       const isQuiz = g.id === 'quiz';
-      const left = isQuiz ? (quizLeft ? `Còn ${quizLeft} lượt hôm nay` : 'Hết lượt — mai quay lại') : '';
+      const left = isQuiz ? (quizLeft ? tn('mg.quiz.left', quizLeft) : t('mg.quiz.out')) : '';
       const enabled = open && !score.banned && (!isQuiz || quizLeft > 0);
       return `
       <li>
-        <button class="game-tile" type="button" data-play="${g.id}" title="${g.title}"
-          aria-label="${g.title} — kỷ lục ${score[g.id]} trên ${g.max}${left ? `. ${left}` : ''}" ${enabled ? '' : 'disabled'}>
+        <button class="game-tile" type="button" data-play="${g.id}" title="${L(g.title)}"
+          aria-label="${t('mg.tile.aria', { title: L(g.title), best: score[g.id], max: g.max })}${left ? `. ${left}` : ''}" ${enabled ? '' : 'disabled'}>
           <span class="game-icon" aria-hidden="true">${g.icon}</span>
-          <span class="game-name">${g.short}</span>
+          <span class="game-name">${L(g.short)}</span>
           <span class="game-best"><b>${score[g.id]}</b>/${g.max}</span>
           ${left ? `<span class="game-left${quizLeft ? '' : ' is-out'}">${left}</span>` : ''}
         </button>
@@ -226,12 +225,19 @@ async function start() {
   rules.addEventListener('cancel', (e) => { e.preventDefault(); closeRules?.(); });
   rules.addEventListener('click', (e) => { if (e.target === rules) closeRules?.(); });
 
+  let rulesGame = null;
+  function paintRules(g) {
+    $('#rules-icon').textContent = g.icon;
+    const rulesText = L(g.rules);
+    $('#rules-title').textContent = L(g.title);
+    $('#rules-list').innerHTML = rulesText.map(() => '<li></li>').join('');
+    [...$('#rules-list').children].forEach((li, i) => { li.textContent = rulesText[i]; });
+  }
+
   function showRules(g) {
     return new Promise((resolve) => {
-      $('#rules-icon').textContent = g.icon;
-      $('#rules-title').textContent = g.title;
-      $('#rules-list').innerHTML = g.rules.map(() => '<li></li>').join('');
-      [...$('#rules-list').children].forEach((li, i) => { li.textContent = g.rules[i]; });
+      rulesGame = g;
+      paintRules(g);
       const timerEl = $('#rules-timer');
       const t0 = performance.now();
       const tick = () => {
@@ -244,6 +250,7 @@ async function start() {
       closeRules = () => {
         closeRules = null;
         clearInterval(timer);
+        rulesGame = null;
         rules.close();
         resolve();
       };
@@ -256,7 +263,7 @@ async function start() {
   async function playGame(id) {
     const g = GAME[id];
     if (id === 'quiz' && !api.quizPlaysLeft(score)) {
-      toast('Bạn đã hết lượt Đố vui hôm nay. Hẹn bạn ngày mai!');
+      toast(t('mg.toast.quizOut'));
       show('lobby');
       return;
     }
@@ -269,7 +276,7 @@ async function start() {
     playing = ctrl;
     const stage = $('#stage');
     stage.innerHTML = '';
-    $('#hud-title').textContent = g.title;
+    $('#hud-title').textContent = L(g.title);
     hud.time('–');
     hud.score(0);
     show('play');
@@ -287,9 +294,9 @@ async function start() {
     } catch (err) {
       console.warn(err);
       if (ctrl.signal.aborted) return;
-      if (err.code !== 'permission-denied') toast('Có lỗi kết nối. Vui lòng thử lại.');
-      else if (id === 'quiz') toast('Bạn đã hết lượt Đố vui hôm nay, hoặc vừa bắt đầu lượt khác. Thử lại sau vài giây.');
-      else toast('Lượt chơi chưa được ghi nhận (bắt đầu quá nhanh hoặc ngoài giờ mở game). Thử lại sau vài giây.');
+      if (err.code !== 'permission-denied') toast(t('mg.toast.connect'));
+      else if (id === 'quiz') toast(t('mg.toast.quizDenied'));
+      else toast(t('mg.toast.sessionDenied'));
       show('lobby');
     }
   }
@@ -314,9 +321,18 @@ async function start() {
     });
   }
 
+  /** Chữ ở màn kết quả phụ thuộc game và ngôn ngữ nên vẽ lại mỗi khi đổi ngôn ngữ. */
+  let resultGame = null;
+  function renderResultTexts() {
+    if (!resultGame) return;
+    $('#res-title').textContent = L(resultGame.title);
+    const again = $('#btn-again');
+    again.textContent = t(again.disabled ? 'mg.res.out' : 'mg.res.again');
+  }
+
   async function showResult(g, result) {
     const best = score[g.id];
-    $('#res-title').textContent = g.title;
+    resultGame = g;
     $('#res-score').textContent = result;
     $('#res-max').textContent = g.max;
     $('#res-best').textContent = Math.max(best, result);
@@ -326,7 +342,7 @@ async function start() {
     again.dataset.play = g.id;
     const outOfQuiz = g.id === 'quiz' && !api.quizPlaysLeft(score);
     again.disabled = outOfQuiz;
-    again.textContent = outOfQuiz ? 'Hết lượt hôm nay' : 'Chơi lại';
+    renderResultTexts();
     show('result');
     if (result <= best) { sfx.finish(); return; }
     try {
@@ -337,9 +353,7 @@ async function start() {
     } catch (err) {
       console.warn(err);
       $('#res-saving').hidden = true;
-      toast(err.code === 'permission-denied'
-        ? 'Điểm không được ghi nhận vì không hợp lệ hoặc đã hết giờ tính điểm.'
-        : 'Không lưu được điểm. Kiểm tra kết nối mạng.');
+      toast(t(err.code === 'permission-denied' ? 'mg.toast.scoreInvalid' : 'mg.toast.scoreFail'));
     }
   }
 
@@ -352,6 +366,14 @@ async function start() {
     }).join('');
     setTimeout(() => { box.innerHTML = ''; }, 3200);
   }
+
+  // đổi ngôn ngữ: vẽ lại phần chữ do JS tạo (họ tên, MSNV, email giữ nguyên vì lấy từ dữ liệu người chơi)
+  onLangChange(() => {
+    $('#close-label').textContent = L(GAMES.closeLabel);
+    renderLobby();
+    renderResultTexts();
+    if (rulesGame) paintRules(rulesGame); // đang mở bảng luật thì đổi chữ luôn
+  });
 
   $('#btn-again').addEventListener('click', (e) => playGame(e.currentTarget.dataset.play));
   $('#btn-lobby').addEventListener('click', () => show('lobby'));
