@@ -73,6 +73,23 @@
           </table>
         </div>
       </section>
+
+      <section class="card mg-card admin-wide">
+        <p class="kicker">4 · Ngân hàng câu hỏi Đố vui</p>
+        <h2>Duyệt câu hỏi</h2>
+        <p>Đáp án đúng được tô xanh. Muốn sửa, thêm hoặc bớt câu: sửa file <code>assets/js/minigame/quiz-bank.js</code> rồi push lên GitHub.</p>
+        <p class="fine" id="bank-summary"></p>
+        <div class="actions">
+          <button class="btn btn-small" id="btn-bank" type="button">Hiện toàn bộ câu hỏi</button>
+          <button class="btn btn-ghost btn-small" id="btn-bank-export" type="button">Xuất CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table class="admin-table bank-table" id="bank-table" hidden>
+            <thead><tr><th>#</th><th>Chủ đề</th><th>Câu hỏi</th><th>Đáp án đúng</th><th>Đáp án sai</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
     </div>
   </main>
 

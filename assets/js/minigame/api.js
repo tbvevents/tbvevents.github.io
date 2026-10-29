@@ -6,6 +6,7 @@ import {
   collection, query, where, getCountFromServer,
 } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js';
 import { app, db, MY_MSNV_KEY } from '../firebase.js';
+import { GAMES } from '../config.js';
 
 export const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
@@ -53,10 +54,28 @@ export function rememberMsnv(msnv) {
 
 export const watchMyScore = (uid, cb) => onSnapshot(doc(db, 'scores', uid), (s) => cb(s.exists() ? s.data() : null));
 
-/** Bắt đầu một lượt: server ghi thời điểm bắt đầu. Phải xong trước khi game chạy. */
-export const startSession = (game) => updateDoc(doc(db, 'scores', auth.currentUser.uid), {
-  session: { game, startedAt: serverTimestamp() },
-});
+/** Ngày hiện tại theo giờ VN, cùng định dạng với vnToday() trong firestore.rules (không thêm số 0: 2026-11-5). */
+export function vnToday() {
+  const d = new Date(Date.now() + 7 * 3600e3);
+  return `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
+}
+
+/** Số lượt Đố vui còn lại hôm nay. */
+export const quizPlaysLeft = (score) => Math.max(0, GAMES.quizDailyPlays - (score?.quizDay === vnToday() ? score.quizPlays || 0 : 0));
+
+/**
+ * Bắt đầu một lượt: server ghi thời điểm bắt đầu. Phải xong trước khi game chạy.
+ * Đố vui ghi thêm bộ đếm lượt trong ngày (rules kiểm tra).
+ */
+export function startSession(game, current) {
+  const data = { session: { game, startedAt: serverTimestamp() } };
+  if (game === 'quiz') {
+    const today = vnToday();
+    data.quizDay = today;
+    data.quizPlays = current?.quizDay === today ? (current.quizPlays || 0) + 1 : 1;
+  }
+  return updateDoc(doc(db, 'scores', auth.currentUser.uid), data);
+}
 
 /**
  * Nộp điểm khi phá kỷ lục của game đó (điểm thấp hơn thì không cần ghi, tiết kiệm quota).

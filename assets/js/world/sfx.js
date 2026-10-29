@@ -63,6 +63,11 @@ if (typeof window !== 'undefined' && !window.__sfxUnlockBound) {
 /** Trạng thái AudioContext ('none' nếu chưa tạo) — dùng để kiểm tra. */
 export const audioState = () => (ctx ? ctx.state : 'none');
 
+/** AudioContext + bus chính cho các âm thanh khác (mini game); null nếu trình duyệt không hỗ trợ. */
+export function getAudio() {
+  return ready() ? { ctx, master, noise } : null;
+}
+
 function noiseSource(t, dur) {
   const s = ctx.createBufferSource();
   s.buffer = noise;

@@ -1,6 +1,8 @@
 // Hứng lì xì: 30 giây, kéo giỏ hứng bao lì xì rơi, né pháo.
 // Số vật rơi cố định (40 bao đỏ +1, 8 bao vàng +3, 14 quả pháo −2) nên điểm tối đa đúng bằng 64,
 // khớp với trần điểm trong firestore.rules.
+import * as sfx from './sounds.js';
+
 const DURATION = 30;
 const KINDS = {
   red: { count: 40, points: 1 },
@@ -40,6 +42,7 @@ export function play(stage, hud, signal) {
     const floats = [];
     let score = 0;
     let shake = 0;
+    let lastSec = DURATION;
 
     const toX = (clientX) => {
       const r = canvas.getBoundingClientRect();
@@ -78,7 +81,12 @@ export function play(stage, hud, signal) {
       last = now;
       const t = (now - t0) / 1000;
       const left = Math.max(0, DURATION - t);
-      hud.time(Math.ceil(left));
+      const sec = Math.ceil(left);
+      hud.time(sec);
+      if (sec !== lastSec) {
+        lastSec = sec;
+        if (sec > 0 && sec <= 5) sfx.tick();
+      }
 
       if (keys.left) basket.target = Math.max(0, basket.target - dt * 1.4);
       if (keys.right) basket.target = Math.min(1, basket.target + dt * 1.4);
@@ -106,6 +114,9 @@ export function play(stage, hud, signal) {
           hud.score(score);
           floats.push({ x: it.px, y: by - 30, text: p > 0 ? `+${p}` : `${p}`, bad: p < 0, life: 1 });
           if (p < 0) shake = 0.35;
+          if (it.kind === 'bomb') sfx.bomb();
+          else if (it.kind === 'gold') sfx.goldCoin();
+          else sfx.coin();
         } else if (it.y > h) {
           it.done = true;
         }

@@ -1,11 +1,22 @@
 // Trang mini game: đăng nhập Gmail → nhập MSNV → chọn game → nộp điểm.
 import { GAMES } from '../config.js';
-import { isConfigured, watchTop10, renderTop10 } from '../firebase.js';
-import { rocketBurst } from '../world/sfx.js';
+import { isConfigured } from '../firebase.js';
+import * as sfx from './sounds.js';
 
 const $ = (s) => document.querySelector(s);
 const screens = ['config', 'login', 'claim', 'lobby', 'play', 'result'];
-const show = (name) => screens.forEach((s) => { $(`#s-${s}`).hidden = s !== name; });
+const musicBtn = $('#music-toggle');
+const show = (name) => {
+  screens.forEach((s) => { $(`#s-${s}`).hidden = s !== name; });
+  // đang chơi: ẩn header để vùng chơi chiếm gần hết màn hình
+  const playingNow = name === 'play';
+  document.body.classList.toggle('is-playing', playingNow);
+  // nút nhạc nằm trong HUD khi chơi để không che vùng chơi, ngoài ra nổi ở góc màn hình
+  if (!musicBtn) return;
+  if (playingNow) $('.hud').appendChild(musicBtn);
+  else if (musicBtn.parentElement !== document.body) document.body.appendChild(musicBtn);
+};
+const RULES_SECONDS = 10;
 
 const toastEl = $('#toast');
 let toastTimer = 0;
@@ -38,7 +49,6 @@ async function start() {
   let profile = null;
   let score = null;
   let stopScore = null;
-  let stopTop = null;
   let pendingMsnv = '';
   let playing = null;
   let rankedTotal = -1;
@@ -64,6 +74,7 @@ async function start() {
     stopScore?.();
     stopScore = null;
     abortGame();
+    closeRules?.();
     if (!user) {
       $('#who').hidden = true;
       show('login');
@@ -140,9 +151,6 @@ async function start() {
   /* ── sảnh ── */
   function enterLobby(uid) {
     show('lobby');
-    if (!stopTop) {
-      stopTop = watchTop10((rows) => renderTop10($('#lobby-top10'), rows), (err) => console.warn('Top 10 unavailable', err));
-    }
     stopScore = api.watchMyScore(uid, (s) => {
       score = s;
       renderLobby();
@@ -163,16 +171,22 @@ async function start() {
       $('#closed-note').hidden = false;
       $('#closed-note').textContent = 'Kết quả của bạn đang được BTC xem xét. Vui lòng liên hệ BTC.';
     }
-    $('#game-list').innerHTML = GAMES.list.map((g) => `
-      <li class="game-card">
-        <span class="game-icon" aria-hidden="true">${g.icon}</span>
-        <div>
-          <h3>${g.title}</h3>
-          <p>${g.desc}</p>
-          <p class="game-best">Kỷ lục: <b>${score[g.id]}</b> / ${g.max}</p>
-        </div>
-        <button class="btn btn-small" type="button" data-play="${g.id}" ${open && !score.banned ? '' : 'disabled'}>Chơi</button>
-      </li>`).join('');
+    const quizLeft = api.quizPlaysLeft(score);
+    $('#game-list').innerHTML = GAMES.list.map((g) => {
+      const isQuiz = g.id === 'quiz';
+      const left = isQuiz ? (quizLeft ? `Còn ${quizLeft} lượt hôm nay` : 'Hết lượt — mai quay lại') : '';
+      const enabled = open && !score.banned && (!isQuiz || quizLeft > 0);
+      return `
+      <li>
+        <button class="game-tile" type="button" data-play="${g.id}" title="${g.title}"
+          aria-label="${g.title} — kỷ lục ${score[g.id]} trên ${g.max}${left ? `. ${left}` : ''}" ${enabled ? '' : 'disabled'}>
+          <span class="game-icon" aria-hidden="true">${g.icon}</span>
+          <span class="game-name">${g.short}</span>
+          <span class="game-best"><b>${score[g.id]}</b>/${g.max}</span>
+          ${left ? `<span class="game-left${quizLeft ? '' : ' is-out'}">${left}</span>` : ''}
+        </button>
+      </li>`;
+    }).join('');
     // mỗi lần đếm hạng tốn 1 lượt đọc, nên chỉ đếm lại khi tổng điểm đổi
     if (score.total !== rankedTotal) {
       rankedTotal = score.total;
@@ -201,8 +215,53 @@ async function start() {
     show('lobby');
   });
 
+  /* ── popup luật chơi: đóng bằng nút, ✕, Esc, bấm ra ngoài, hoặc tự đóng sau 10 giây ── */
+  const rules = $('#rules');
+  let closeRules = null;
+  $('#rules-start').addEventListener('click', () => closeRules?.());
+  $('#rules-close').addEventListener('click', () => closeRules?.());
+  rules.addEventListener('cancel', (e) => { e.preventDefault(); closeRules?.(); });
+  rules.addEventListener('click', (e) => { if (e.target === rules) closeRules?.(); });
+
+  function showRules(g) {
+    return new Promise((resolve) => {
+      $('#rules-icon').textContent = g.icon;
+      $('#rules-title').textContent = g.title;
+      $('#rules-list').innerHTML = g.rules.map(() => '<li></li>').join('');
+      [...$('#rules-list').children].forEach((li, i) => { li.textContent = g.rules[i]; });
+      const timerEl = $('#rules-timer');
+      const t0 = performance.now();
+      const tick = () => {
+        const left = Math.max(0, RULES_SECONDS - (performance.now() - t0) / 1000);
+        $('#rules-sec').textContent = Math.ceil(left);
+        timerEl.style.setProperty('--p', left / RULES_SECONDS);
+        if (left <= 0) closeRules();
+      };
+      const timer = setInterval(tick, 100);
+      closeRules = () => {
+        closeRules = null;
+        clearInterval(timer);
+        rules.close();
+        resolve();
+      };
+      tick();
+      rules.showModal();
+      $('#rules-start').focus();
+    });
+  }
+
   async function playGame(id) {
     const g = GAME[id];
+    if (id === 'quiz' && !api.quizPlaysLeft(score)) {
+      toast('Bạn đã hết lượt Đố vui hôm nay. Hẹn bạn ngày mai!');
+      show('lobby');
+      return;
+    }
+    const modReady = loaders[id](); // nạp trước module game trong lúc đọc luật
+    modReady.catch(() => {});
+    await showRules(g);
+    if (!api.auth.currentUser) return;
+
     const ctrl = new AbortController();
     playing = ctrl;
     const stage = $('#stage');
@@ -213,8 +272,8 @@ async function start() {
     show('play');
 
     try {
-      // server ghi thời điểm bắt đầu trước khi game chạy (rules dùng để chặn nộp điểm quá nhanh)
-      const [mod] = await Promise.all([loaders[id](), api.startSession(id)]);
+      // phiên chơi bắt đầu sau khi đóng popup, nên thời gian đọc luật không tính vào thời gian chơi tối thiểu trong rules
+      const [mod] = await Promise.all([modReady, api.startSession(id, score)]);
       if (ctrl.signal.aborted) return;
       await countdown(stage, ctrl.signal);
       if (ctrl.signal.aborted) return;
@@ -225,9 +284,9 @@ async function start() {
     } catch (err) {
       console.warn(err);
       if (ctrl.signal.aborted) return;
-      toast(err.code === 'permission-denied'
-        ? 'Lượt chơi chưa được ghi nhận (bắt đầu quá nhanh hoặc ngoài giờ mở game). Thử lại sau vài giây.'
-        : 'Có lỗi kết nối. Vui lòng thử lại.');
+      if (err.code !== 'permission-denied') toast('Có lỗi kết nối. Vui lòng thử lại.');
+      else if (id === 'quiz') toast('Bạn đã hết lượt Đố vui hôm nay, hoặc vừa bắt đầu lượt khác. Thử lại sau vài giây.');
+      else toast('Lượt chơi chưa được ghi nhận (bắt đầu quá nhanh hoặc ngoài giờ mở game). Thử lại sau vài giây.');
       show('lobby');
     }
   }
@@ -240,8 +299,9 @@ async function start() {
       let n = 3;
       const step = () => {
         if (signal.aborted) { el.remove(); resolve(); return; }
-        if (n === 0) { el.remove(); resolve(); return; }
+        if (n === 0) { el.remove(); sfx.go(); resolve(); return; }
         el.textContent = n--;
+        sfx.tick();
         el.classList.remove('pop');
         void el.offsetWidth;
         el.classList.add('pop');
@@ -259,9 +319,13 @@ async function start() {
     $('#res-best').textContent = Math.max(best, result);
     $('#res-record').hidden = true;
     $('#res-saving').hidden = result <= best;
-    $('#btn-again').dataset.play = g.id;
+    const again = $('#btn-again');
+    again.dataset.play = g.id;
+    const outOfQuiz = g.id === 'quiz' && !api.quizPlaysLeft(score);
+    again.disabled = outOfQuiz;
+    again.textContent = outOfQuiz ? 'Hết lượt hôm nay' : 'Chơi lại';
     show('result');
-    if (result <= best) return;
+    if (result <= best) { sfx.finish(); return; }
     try {
       await api.submitScore(g.id, result, score);
       $('#res-saving').hidden = true;
@@ -277,7 +341,7 @@ async function start() {
   }
 
   function celebrate() {
-    for (let i = 0; i < 3; i++) rocketBurst((Math.random() - 0.5) * 0.8, i * 0.25);
+    sfx.record();
     const box = $('#confetti');
     box.innerHTML = Array.from({ length: 40 }, () => {
       const c = ['#ffcf4a', '#c8102e', '#ff8fb8', '#fff6e6'][Math.floor(Math.random() * 4)];

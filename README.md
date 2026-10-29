@@ -64,15 +64,23 @@ nằm trong [`firestore.rules`](firestore.rules).
 6. Firestore → **Start collection** `admins` → Document ID = email Google của bạn (không cần field nào). Thêm email các thành viên BTC khác nếu cần.
 7. Mở `/admin.html`, đăng nhập, nạp file CSV danh sách nhân viên (`MSNV,Họ tên`).
 
-### Đổi thời gian / trần điểm
+### Đổi thời gian / trần điểm / số lượt
 
-Sửa `GAMES` trong `config.js` **và** các hàm `gameOpen()`, `maxScore()`, `minSeconds()` trong `firestore.rules` (publish lại rules).
+Sửa `GAMES` trong `config.js` **và** các hàm `gameOpen()`, `maxScore()`, `minSeconds()`, `quizDailyPlays()` trong `firestore.rules` (publish lại rules).
+
+### Đố vui: kho câu hỏi và giới hạn lượt
+
+- Kho ~155 câu chia 10 chủ đề nằm trong [`assets/js/minigame/quiz-bank.js`](assets/js/minigame/quiz-bank.js) (đáp án đúng luôn ở vị trí đầu tiên).
+  Mỗi lượt bốc 10 câu, mỗi chủ đề một câu, ưu tiên câu người chơi chưa gặp trên máy đó.
+- BTC duyệt toàn bộ kho ở `admin.html` → mục *Ngân hàng câu hỏi* (đáp án đúng tô xanh, xuất CSV được). Sửa câu thì sửa file trên rồi push.
+- Mỗi người chơi Đố vui tối đa **3 lượt/ngày** (giờ VN). Máy chủ (Firestore rules) đếm, lượt được tính ngay khi bắt đầu.
 
 ### Giới hạn cần biết
 
 - Không có server nên không thể chặn tuyệt đối gian lận: người rành kỹ thuật vẫn có thể gửi điểm sát trần.
   Rules chặn điểm vượt trần, nộp quá nhanh, sửa tên/MSNV. **BTC nên xác minh Top 10 trước khi trao giải**
   (dùng nút *Loại* trong admin nếu thấy bất thường).
+- Đáp án Đố vui nằm trong code phía trình duyệt nên người rành kỹ thuật vẫn đọc được; giới hạn 3 lượt/ngày và trần điểm hạn chế điều này.
 - Google chặn đăng nhập trong trình duyệt nhúng của Zalo/Messenger; trang sẽ nhắc mở bằng Chrome/Safari.
 - Hạn mức miễn phí: 50.000 lượt đọc, 20.000 lượt ghi mỗi ngày; một lượt chơi tốn 1–2 lượt ghi.
 - Họ tên + MSNV hiển thị công khai trên Top 10 (có thông báo khi đăng nhập). Đặt `GAMES.maskMsnv: true` để che bớt MSNV.

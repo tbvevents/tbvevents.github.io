@@ -1,6 +1,8 @@
 // Lật thẻ ghép đôi: 8 cặp biểu tượng Tết trong 90 giây.
 // Hoàn thành: 100 − 2 điểm mỗi lượt lật thừa (quá 12 lượt) − 1 điểm mỗi giây quá 30 giây, tối thiểu 20.
 // Hết giờ chưa xong: 4 điểm mỗi cặp đã ghép.
+import * as sfx from './sounds.js';
+
 const SYMBOLS = [
   ['🌸', 'Hoa đào'], ['🌼', 'Hoa mai'], ['🧧', 'Lì xì'], ['🏮', 'Đèn lồng'],
   ['🐐', 'Dê vàng'], ['🎆', 'Pháo hoa'], ['🐉', 'Rồng'], ['🍊', 'Quả quýt'],
@@ -42,9 +44,15 @@ export function play(stage, hud, signal) {
       setTimeout(() => { grid.remove(); resolve(score); }, 700);
     };
 
+    let lastSec = LIMIT;
     const timer = setInterval(() => {
       const left = LIMIT - elapsed();
-      hud.time(Math.max(0, Math.ceil(left)));
+      const sec = Math.max(0, Math.ceil(left));
+      hud.time(sec);
+      if (sec !== lastSec) {
+        lastSec = sec;
+        if (sec > 0 && sec <= 5) sfx.tick();
+      }
       hud.score(pairs * 4);
       if (left <= 0) {
         cards.forEach((c) => { c.disabled = true; });
@@ -65,6 +73,7 @@ export function play(stage, hud, signal) {
       const i = +card.dataset.i;
       card.classList.add('is-open');
       card.setAttribute('aria-label', `Thẻ ${i + 1}, ${deck[i][1]}`);
+      sfx.flip();
       open.push(card);
       if (open.length < 2) return;
 
@@ -77,9 +86,11 @@ export function play(stage, hud, signal) {
         a.disabled = b.disabled = true;
         pairs++;
         hud.score(pairs * 4);
+        sfx.match();
         if (pairs === SYMBOLS.length) end(liveScore());
       } else {
         busy = true;
+        setTimeout(sfx.mismatch, 250);
         flipBack = setTimeout(() => {
           for (const c of [a, b]) {
             c.classList.remove('is-open');

@@ -43,10 +43,36 @@ export const GAMES = {
   closeLabel: '23:59 ngày 14.01.2027',
   // true: hiện MSNV dạng 12***8 trên bảng xếp hạng
   maskMsnv: false,
+  // số lượt Đố vui mỗi ngày (giờ VN) — giữ khớp với quizDailyPlays() trong firestore.rules
+  quizDailyPlays: 3,
   list: [
-    { id: 'lixi', title: 'Hứng lì xì', icon: '🧧', max: 64, desc: '30 giây hứng bao lì xì, né pháo nổ.' },
-    { id: 'quiz', title: 'Đố vui Tết ba miền', icon: '🏮', max: 100, desc: '10 câu hỏi, trả lời càng nhanh càng nhiều điểm.' },
-    { id: 'memory', title: 'Lật thẻ ghép đôi', icon: '🌸', max: 100, desc: 'Ghép 8 cặp biểu tượng Tết, ít lượt lật nhất.' },
+    {
+      id: 'lixi', title: 'Hứng lì xì', short: 'Lì xì', icon: '🧧', max: 64,
+      rules: [
+        'Kéo/chạm ngón tay (hoặc phím ← →) để di chuyển giỏ.',
+        'Bao lì xì đỏ +1 điểm, bao vàng +3 điểm.',
+        'Né pháo nổ: hứng trúng bị −2 điểm.',
+        'Thời gian 30 giây, tối đa 64 điểm.',
+      ],
+    },
+    {
+      id: 'quiz', title: 'Đố vui Tết ba miền', short: 'Đố vui', icon: '🏮', max: 100,
+      rules: [
+        '10 câu hỏi ngẫu nhiên, mỗi câu 15 giây.',
+        'Trả lời đúng được 5 điểm.',
+        'Thưởng tốc độ tối đa 5 điểm: trả lời càng nhanh càng nhiều. Tối đa 100 điểm.',
+        'Mỗi ngày 3 lượt; thoát giữa chừng vẫn tính 1 lượt.',
+      ],
+    },
+    {
+      id: 'memory', title: 'Lật thẻ ghép đôi', short: 'Lật thẻ', icon: '🌸', max: 100,
+      rules: [
+        'Lật 2 thẻ mỗi lượt, ghép đủ 8 cặp biểu tượng Tết.',
+        'Càng ít lượt lật, càng nhanh thì càng nhiều điểm.',
+        'Giới hạn 90 giây; hết giờ được 4 điểm mỗi cặp đã ghép.',
+        'Tối đa 100 điểm.',
+      ],
+    },
   ],
 };
 

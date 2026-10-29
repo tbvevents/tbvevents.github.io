@@ -6,7 +6,7 @@ rules_version = '2';
 // Dữ liệu:
 //   employees/{msnv}  { name, claimedBy }                 admin nạp từ CSV
 //   users/{uid}       { msnv, email, createdAt }          1 Gmail ↔ 1 MSNV
-//   scores/{uid}      { msnv, name, lixi, quiz, memory, total, updatedAt, session, banned? }
+//   scores/{uid}      { msnv, name, lixi, quiz, memory, total, updatedAt, session, quizDay?, quizPlays?, banned? }
 //   admins/{email}    {}                                  tạo tay trong Console
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -29,6 +29,13 @@ service cloud.firestore {
     function maxScore(g) { return g == 'lixi' ? 64 : 100; }
     function minSeconds(g) { return g == 'lixi' ? 30 : g == 'quiz' ? 15 : 8; }
     function maxSeconds(g) { return 600; }
+
+    // Đố vui: tối đa 3 lượt mỗi ngày (giờ VN) — giữ khớp với GAMES.quizDailyPlays trong config.js
+    function quizDailyPlays() { return 3; }
+    function vnToday() {
+      let t = request.time + duration.value(7, 'h');
+      return string(t.year()) + '-' + string(t.month()) + '-' + string(t.day());
+    }
 
     match /admins/{email} {
       allow get: if signedIn() && request.auth.token.email == email;
@@ -76,11 +83,23 @@ service cloud.firestore {
       function isStart() {
         let s = request.resource.data.session;
         let old = resource.data.session;
-        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['session'])
+        return s != null
           && s.keys().hasOnly(['game', 'startedAt'])
-          && s.game in ['lixi', 'quiz', 'memory']
           && s.startedAt == request.time
-          && (old == null || request.time > old.startedAt + duration.value(5, 's'));
+          && (old == null || request.time > old.startedAt + duration.value(5, 's'))
+          && ((s.game in ['lixi', 'memory'] && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['session']))
+            || (s.game == 'quiz' && quizStartOk()));
+      }
+
+      // lượt Đố vui được tính ngay khi bắt đầu (thoát giữa chừng vẫn mất lượt), máy chủ đếm theo ngày VN
+      function quizStartOk() {
+        let d = request.resource.data;
+        let prevDay = resource.data.get('quizDay', '');
+        let prevPlays = resource.data.get('quizPlays', 0);
+        return d.diff(resource.data).affectedKeys().hasOnly(['session', 'quizDay', 'quizPlays'])
+          && d.quizDay == vnToday()
+          && ((prevDay == vnToday() && prevPlays < quizDailyPlays() && d.quizPlays == prevPlays + 1)
+            || (prevDay != vnToday() && d.quizPlays == 1));
       }
 
       // nộp điểm: chỉ khi đang có lượt, đã chơi đủ lâu, không vượt trần, và chỉ ghi khi phá kỷ lục

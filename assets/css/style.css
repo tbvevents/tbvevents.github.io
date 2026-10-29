@@ -468,6 +468,7 @@ main { position: relative; z-index: 5; }
   backdrop-filter: blur(6px);
   transition: transform 0.2s, background 0.3s, box-shadow 0.3s;
 }
+.music-toggle[hidden] { display: none; }
 .music-toggle:hover { transform: scale(1.08); }
 .music-toggle:focus-visible { outline: 2px solid var(--gold-soft); outline-offset: 3px; }
 .music-toggle .ic-mute { opacity: 1; }

@@ -4,6 +4,7 @@ import {
   doc, getDoc, getDocs, writeBatch, updateDoc, collection, query, orderBy,
 } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js';
 import { isConfigured, db } from './firebase.js';
+import { BANK, TOPICS } from './minigame/quiz-bank.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -127,17 +128,39 @@ async function start() {
   });
 
   $('#btn-export').addEventListener('click', () => {
-    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const lines = [['Hạng', 'MSNV', 'Họ tên', 'Hứng lì xì', 'Đố vui', 'Lật thẻ', 'Tổng', 'Cập nhật', 'Bị loại']]
-      .concat(scores.map((s, i) => [i + 1, s.msnv, s.name, s.lixi, s.quiz, s.memory, s.total, fmt(s.updatedAt), s.banned ? 'x' : '']))
-      .map((r) => r.map(cell).join(','));
-    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `yep2026-bang-diem-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    downloadCsv(`yep2026-bang-diem-${new Date().toISOString().slice(0, 10)}.csv`,
+      [['Hạng', 'MSNV', 'Họ tên', 'Hứng lì xì', 'Đố vui', 'Lật thẻ', 'Tổng', 'Cập nhật', 'Bị loại']]
+        .concat(scores.map((s, i) => [i + 1, s.msnv, s.name, s.lixi, s.quiz, s.memory, s.total, fmt(s.updatedAt), s.banned ? 'x' : ''])));
   });
+
+  /* ── 4 · ngân hàng câu hỏi ── */
+  const counts = Object.entries(TOPICS).map(([k, label]) => `${label} ${BANK.filter((x) => x.t === k).length}`);
+  $('#bank-summary').textContent = `${BANK.length} câu — ${counts.join(' · ')}`;
+  $('#btn-bank').addEventListener('click', () => {
+    const table = $('#bank-table');
+    table.querySelector('tbody').innerHTML = BANK.map((x, i) => `
+      <tr>
+        <td>${i + 1}</td><td>${esc(TOPICS[x.t] ?? x.t)}</td><td>${esc(x.q)}</td>
+        <td class="is-right">${esc(x.o[0])}</td><td>${x.o.slice(1).map(esc).join('<br>')}</td>
+      </tr>`).join('');
+    table.hidden = false;
+  });
+  $('#btn-bank-export').addEventListener('click', () => {
+    downloadCsv('yep2026-ngan-hang-cau-hoi.csv',
+      [['#', 'Chủ đề', 'Câu hỏi', 'Đáp án đúng', 'Sai 1', 'Sai 2', 'Sai 3']]
+        .concat(BANK.map((x, i) => [i + 1, TOPICS[x.t] ?? x.t, x.q, ...x.o])));
+  });
+}
+
+/** Tải mảng các dòng xuống thành file CSV mở được bằng Excel (UTF-8 có BOM). */
+function downloadCsv(filename, rows) {
+  const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const blob = new Blob(['﻿' + rows.map((r) => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 /** CSV/TSV hai cột MSNV, Họ tên. Trả về các dòng hợp lệ và số dòng bị bỏ qua. */
