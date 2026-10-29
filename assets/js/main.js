@@ -31,6 +31,8 @@ const STOPS = [
   { build: City.buildHoiAn, at: [-10, 0, -178], cam: [3, 7.5, -157], look: [-10, 3, -180], shift: -0.5 },
   { build: City.buildHCM, at: [-14, 0, -228], cam: [3, 10, -195], look: [-14, 10, -230], shift: 0.5 },
   { build: City.buildStage, at: [0, 0, -282], cam: [0, 7, -252], look: [0, 5, -288], shift: -0.45 },
+  // mini game: the stage again, seen from the side and higher up, fireworks in full swing
+  { build: null, at: [0, 0, -282], cam: [36, 20, -250], look: [0, 9, -284], shift: 0.5 },
   // finale: bird's-eye view of the whole S-shaped route, north on the left, south on the right
   { build: null, at: [0, 0, -130], cam: [175, 125, -132], look: [0, -10, -132], shift: 0 },
 ];
@@ -223,7 +225,7 @@ function init3D() {
     // automatic fireworks around the current stop; more of them at the party stage
     nextShow -= dt;
     if (nextShow <= 0) {
-      const party = u > last - 1.5;
+      const party = u > last - 2.5;
       nextShow = reduceMotion ? 3.5 : party ? rand(0.35, 0.8) : rand(0.9, 1.9);
       const base = party && u > last - 0.5 ? new THREE.Vector3(rand(-30, 30), 0, rand(-260, -20)) : look.clone();
       const from = new THREE.Vector3(base.x + rand(-22, 22), 0, base.z + rand(-14, 2));

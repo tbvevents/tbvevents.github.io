@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Quản trị mini game · YEP 2026</title>
+  <meta name="theme-color" content="#5a0f2a" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;600;800&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="stylesheet" href="assets/css/minigame.css" />
+  <script type="module" src="assets/js/admin.js"></script>
+</head>
+<body class="mg">
+  <header class="mg-top">
+    <a class="brand" href="./">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span><strong>Quản trị mini game</strong><small>YEP 2026</small></span>
+    </a>
+    <div class="who" id="who" hidden>
+      <span id="who-email"></span>
+      <button class="btn btn-ghost btn-small" id="btn-logout" type="button">Đăng xuất</button>
+    </div>
+  </header>
+
+  <main class="mg-main">
+    <section id="a-login" class="card mg-card" hidden>
+      <h2>Đăng nhập admin</h2>
+      <p>Chỉ email có trong collection <code>admins</code> của Firestore mới dùng được trang này.</p>
+      <button class="btn" id="btn-login" type="button">Đăng nhập bằng Google</button>
+    </section>
+
+    <section id="a-denied" class="card mg-card" hidden>
+      <h2>Không có quyền</h2>
+      <p>Email này chưa được thêm vào collection <code>admins</code>. Vào Firebase Console → Firestore, tạo document có ID là đúng địa chỉ email của bạn.</p>
+    </section>
+
+    <div id="a-panel" class="admin" hidden>
+      <section class="card mg-card">
+        <p class="kicker">1 · Danh sách nhân viên</p>
+        <h2>Nạp CSV</h2>
+        <p>File CSV/TSV hai cột <b>MSNV, Họ tên</b> (dòng tiêu đề nếu có sẽ tự bỏ qua). Từ Excel: <i>File → Save As → CSV UTF-8</i>. Nạp lại nhiều lần được: chỉ cập nhật họ tên, không gỡ liên kết đã có.</p>
+        <input type="file" id="csv" accept=".csv,.tsv,.txt,text/csv" />
+        <p class="fine" id="csv-preview"></p>
+        <div class="actions"><button class="btn" id="btn-import" type="button" disabled>Nạp vào Firestore</button></div>
+      </section>
+
+      <section class="card mg-card">
+        <p class="kicker">2 · Tra cứu MSNV</p>
+        <h2>Liên kết Gmail</h2>
+        <form id="lookup" class="claim-form">
+          <div class="row">
+            <input id="lookup-msnv" placeholder="MSNV" required autocomplete="off" />
+            <button class="btn" type="submit">Tra cứu</button>
+          </div>
+        </form>
+        <div id="lookup-result"></div>
+      </section>
+
+      <section class="card mg-card admin-wide">
+        <p class="kicker">3 · Bảng điểm</p>
+        <h2>Tất cả người chơi</h2>
+        <div class="actions">
+          <button class="btn btn-small" id="btn-load" type="button">Tải bảng điểm</button>
+          <button class="btn btn-ghost btn-small" id="btn-export" type="button" disabled>Xuất CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table class="admin-table" id="score-table">
+            <thead><tr><th>#</th><th>MSNV</th><th>Họ tên</th><th>Lì xì</th><th>Đố vui</th><th>Lật thẻ</th><th>Tổng</th><th>Cập nhật</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

@@ -26,6 +26,7 @@
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js" defer></script>
   <script type="module" src="assets/js/main.js"></script>
+  <script type="module" src="assets/js/leaderboard.js"></script>
 </head>
 <body>
   <div id="loader" aria-hidden="true">
@@ -52,7 +53,8 @@
     <button data-go="4"><span>Hội An</span></button>
     <button data-go="5"><span>TP. HCM</span></button>
     <button data-go="6"><span>Chương trình</span></button>
-    <button data-go="7"><span>Hẹn gặp</span></button>
+    <button data-go="7"><span>Mini game</span></button>
+    <button data-go="8"><span>Hẹn gặp</span></button>
   </nav>
 
   <main>
@@ -147,10 +149,27 @@
       </article>
     </section>
 
-    <!-- 7 · HẸN GẶP -->
-    <section class="panel rsvp" id="hen-gap" data-step="7">
+    <!-- 7 · MINI GAME -->
+    <section class="panel align-right" id="mini-game" data-step="7">
+      <article class="card leaderboard-card">
+        <span class="wish" aria-hidden="true">Vui</span>
+        <p class="kicker" data-anim>07 · Mini game</p>
+        <h2 data-anim>Bảng vàng</h2>
+        <p class="sub" data-anim>Top 10 cao thủ du xuân</p>
+        <ol id="top10" class="leaderboard" data-anim aria-live="polite">
+          <li class="lb-empty">Đang tải bảng xếp hạng…</li>
+        </ol>
+        <p class="lb-note" id="minigame-note" data-anim></p>
+        <div class="actions" data-anim>
+          <a class="btn" href="minigame.html">Chơi ngay</a>
+        </div>
+      </article>
+    </section>
+
+    <!-- 8 · HẸN GẶP -->
+    <section class="panel rsvp" id="hen-gap" data-step="8">
       <article class="card rsvp-card">
-        <p class="kicker" data-anim>07 · Hẹn gặp bạn</p>
+        <p class="kicker" data-anim>08 · Hẹn gặp bạn</p>
         <h2 data-anim>Đếm ngược đến đêm tiệc</h2>
         <div class="countdown" data-anim role="timer" aria-live="off">
           <div><b data-cd="d">00</b><span>Ngày</span></div>

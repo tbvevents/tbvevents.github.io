@@ -31,9 +31,48 @@ Các giá trị đánh dấu `TODO` là giá trị tạm, cần thay bằng thô
 | `assets/js/world/characters.js` | Linh vật Dê vàng, em bé áo dài, ông đồ, múa lân, đèn lồng |
 | `assets/js/world/decor.js` | Bầu trời, cây đào/mai, cánh hoa rơi, đèn trời, bánh chưng, dây pháo |
 | `assets/js/world/fireworks.js` | Hệ hạt pháo hoa |
+| `assets/js/firebase.js`, `leaderboard.js` | Kết nối Firestore, Top 10 realtime trên landing page |
+| `minigame.html`, `assets/js/minigame/` | Trang mini game: đăng nhập, nhận MSNV, 3 game |
+| `admin.html`, `assets/js/admin.js` | Nạp danh sách nhân viên, gỡ liên kết, loại kết quả, xuất CSV |
+| `firestore.rules` | Luật bảo mật & chống gian lận (dán vào Firebase Console) |
 
 Thêm điểm dừng mới: thêm một `<section data-step>` trong HTML và một phần tử tương ứng trong mảng `STOPS` ở `main.js`.
 
 Thư viện (CDN, phiên bản cố định): three.js 0.170.0, GSAP 3.13.0, @splinetool/viewer 2.0.64 (chỉ tải khi có `splineScene`).
 
 Thêm `?debug` vào URL để truy cập scene qua `window.__yep` trong DevTools.
+
+## Mini game & bảng xếp hạng (Firebase miễn phí)
+
+Nhân viên đăng nhập Gmail ở `minigame.html`, nhập MSNV (phải có trong danh sách nhân viên), rồi chơi 3 game:
+Hứng lì xì, Đố vui Tết ba miền, Lật thẻ ghép đôi. Mỗi game giữ lượt cao nhất; tổng 3 game quyết định Top 10,
+hiển thị realtime ở section "Mini game" của landing page. `admin.html` dành cho BTC.
+
+Dùng Firebase gói **Spark** (miễn phí, không cần thẻ): Authentication (Google) + Cloud Firestore.
+Không có server riêng: mọi kiểm tra (1 Gmail ↔ 1 MSNV, trần điểm, thời gian chơi tối thiểu, khung giờ mở game)
+nằm trong [`firestore.rules`](firestore.rules).
+
+### Cài đặt (một lần, ~15 phút)
+
+1. [console.firebase.google.com](https://console.firebase.google.com) → **Add project** (tắt Google Analytics cũng được). Giữ gói Spark.
+2. **Build → Authentication → Get started → Google → Enable**. Vào tab **Settings → Authorized domains**, thêm `tbvevents.github.io`.
+3. **Build → Firestore Database → Create database**, chọn location `asia-southeast1`, chế độ production.
+   Tab **Rules**: dán toàn bộ nội dung `firestore.rules` → **Publish**.
+4. Tab **Indexes → Composite → Create index**: collection `scores`, field `total` *Descending*, field `updatedAt` *Ascending*, query scope *Collection*.
+   (Hoặc mở landing page, bấm link tạo index trong lỗi ở DevTools Console.)
+5. **Project settings → Your apps → Web (`</>`)** → đăng ký app → copy `apiKey`, `authDomain`, `projectId`, `appId` vào `FIREBASE` trong [`assets/js/config.js`](assets/js/config.js).
+6. Firestore → **Start collection** `admins` → Document ID = email Google của bạn (không cần field nào). Thêm email các thành viên BTC khác nếu cần.
+7. Mở `/admin.html`, đăng nhập, nạp file CSV danh sách nhân viên (`MSNV,Họ tên`).
+
+### Đổi thời gian / trần điểm
+
+Sửa `GAMES` trong `config.js` **và** các hàm `gameOpen()`, `maxScore()`, `minSeconds()` trong `firestore.rules` (publish lại rules).
+
+### Giới hạn cần biết
+
+- Không có server nên không thể chặn tuyệt đối gian lận: người rành kỹ thuật vẫn có thể gửi điểm sát trần.
+  Rules chặn điểm vượt trần, nộp quá nhanh, sửa tên/MSNV. **BTC nên xác minh Top 10 trước khi trao giải**
+  (dùng nút *Loại* trong admin nếu thấy bất thường).
+- Google chặn đăng nhập trong trình duyệt nhúng của Zalo/Messenger; trang sẽ nhắc mở bằng Chrome/Safari.
+- Hạn mức miễn phí: 50.000 lượt đọc, 20.000 lượt ghi mỗi ngày; một lượt chơi tốn 1–2 lượt ghi.
+- Họ tên + MSNV hiển thị công khai trên Top 10 (có thông báo khi đăng nhập). Đặt `GAMES.maskMsnv: true` để che bớt MSNV.

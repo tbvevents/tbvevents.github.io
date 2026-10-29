@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini game · YEP 2026 · Terumo BCT Việt Nam</title>
+  <meta name="description" content="Mini game Year End Party 2026 — chơi, ghi điểm và lọt Top 10 cao thủ du xuân." />
+  <meta name="theme-color" content="#5a0f2a" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='34' r='22' fill='%23e8202e'/%3E%3Crect x='22' y='8' width='20' height='6' rx='2' fill='%23ffcf4a'/%3E%3Crect x='22' y='54' width='20' height='6' rx='2' fill='%23ffcf4a'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;600;800&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="stylesheet" href="assets/css/minigame.css" />
+  <script type="module" src="assets/js/minigame/app.js"></script>
+</head>
+<body class="mg">
+  <header class="mg-top">
+    <a class="brand" href="./#mini-game">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span><strong>Terumo BCT Việt Nam</strong><small>YEP 2026 · MINI GAME</small></span>
+    </a>
+    <div class="who" id="who" hidden>
+      <span id="who-email"></span>
+      <button class="btn btn-ghost btn-small" id="btn-logout" type="button">Đăng xuất</button>
+    </div>
+  </header>
+
+  <main class="mg-main">
+    <!-- chưa cấu hình Firebase -->
+    <section id="s-config" class="card mg-card" hidden>
+      <p class="kicker">Mini game</p>
+      <h2>Sắp mở</h2>
+      <p>Mini game đang được chuẩn bị. Hẹn bạn quay lại sớm!</p>
+      <a class="btn" href="./">Về trang sự kiện</a>
+    </section>
+
+    <!-- đăng nhập -->
+    <section id="s-login" class="card mg-card" hidden>
+      <p class="kicker">Mini game · Du xuân ba miền</p>
+      <h2>Chơi game, rinh quà Tết</h2>
+      <p>3 trò chơi nhỏ, mỗi trò tính lượt có điểm cao nhất. Tổng điểm cao nhất lọt <b>Top 10</b> trên trang sự kiện. Hạn chót tính điểm: <b id="close-label"></b>.</p>
+      <p class="warn" id="inapp-warn" hidden>Bạn đang mở trang trong ứng dụng (Zalo, Messenger…). Google không cho đăng nhập ở đây — hãy bấm <b>⋯</b> và chọn <b>Mở bằng trình duyệt</b> (Chrome/Safari).</p>
+      <button class="btn" id="btn-login" type="button">
+        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.7 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.8c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.8-5.8l-7.4-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.2-13.5-10l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>
+        Đăng nhập bằng Google
+      </button>
+      <p class="fine">Khi tham gia, bạn đồng ý để <b>họ tên và mã số nhân viên</b> của mình hiển thị trên bảng xếp hạng công khai của sự kiện. Gmail chỉ dùng để đăng nhập và không hiển thị.</p>
+    </section>
+
+    <!-- nhận MSNV -->
+    <section id="s-claim" class="card mg-card" hidden>
+      <p class="kicker">Bước 2 / 2</p>
+      <h2>Mã số nhân viên</h2>
+      <form id="claim-form" class="claim-form">
+        <label for="msnv">Nhập MSNV của bạn (chỉ cần làm một lần)</label>
+        <div class="row">
+          <input id="msnv" name="msnv" autocomplete="off" autocapitalize="characters" inputmode="text" maxlength="20" required placeholder="VD: 12345" />
+          <button class="btn" type="submit">Kiểm tra</button>
+        </div>
+      </form>
+      <div id="claim-confirm" hidden>
+        <p>Bạn là <b id="confirm-name"></b> — MSNV <b id="confirm-msnv"></b>?</p>
+        <p class="fine">Mỗi MSNV chỉ liên kết được với một Gmail và không đổi lại được (trừ khi BTC hỗ trợ).</p>
+        <div class="actions">
+          <button class="btn" id="btn-confirm" type="button">Đúng, đó là tôi</button>
+          <button class="btn btn-ghost" id="btn-not-me" type="button">Không phải</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- sảnh -->
+    <section id="s-lobby" class="lobby" hidden>
+      <div class="card mg-card me-card">
+        <p class="kicker">Xin chào</p>
+        <h2 id="me-name"></h2>
+        <p class="sub">MSNV <span id="me-msnv"></span></p>
+        <div class="me-stats">
+          <div><b id="me-total">0</b><span>Tổng điểm</span></div>
+          <div><b id="me-rank">—</b><span>Hạng</span></div>
+        </div>
+        <p class="warn" id="closed-note" hidden></p>
+        <ul class="game-list" id="game-list"></ul>
+      </div>
+      <div class="card mg-card">
+        <p class="kicker">Bảng vàng</p>
+        <h2>Top 10</h2>
+        <ol id="lobby-top10" class="leaderboard" aria-live="polite"><li class="lb-empty">Đang tải…</li></ol>
+      </div>
+    </section>
+
+    <!-- đang chơi -->
+    <section id="s-play" class="play" hidden>
+      <div class="hud">
+        <button class="btn btn-ghost btn-small" id="btn-exit" type="button">✕ Thoát</button>
+        <strong id="hud-title"></strong>
+        <span class="hud-stat">⏱ <b id="hud-time">–</b></span>
+        <span class="hud-stat">★ <b id="hud-score">0</b></span>
+      </div>
+      <div class="stage" id="stage"></div>
+    </section>
+
+    <!-- kết quả -->
+    <section id="s-result" class="card mg-card result" hidden>
+      <p class="kicker" id="res-title"></p>
+      <p class="res-score"><b id="res-score">0</b><span>/ <span id="res-max"></span></span></p>
+      <p class="res-record" id="res-record" hidden>🎉 Kỷ lục mới!</p>
+      <p class="fine" id="res-saving" hidden>Đang lưu điểm…</p>
+      <p>Kỷ lục của bạn: <b id="res-best"></b></p>
+      <div class="actions">
+        <button class="btn" id="btn-again" type="button">Chơi lại</button>
+        <button class="btn btn-ghost" id="btn-lobby" type="button">Về sảnh</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="confetti" id="confetti" aria-hidden="true"></div>
+</body>
+</html>

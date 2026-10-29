@@ -1,0 +1,105 @@
+rules_version = '2';
+
+// Mini game YEP 2026 — dán toàn bộ file này vào Firebase Console → Firestore → Rules → Publish.
+// Không có server riêng (gói Spark miễn phí), nên mọi kiểm tra điểm đều nằm ở đây.
+//
+// Dữ liệu:
+//   employees/{msnv}  { name, claimedBy }                 admin nạp từ CSV
+//   users/{uid}       { msnv, email, createdAt }          1 Gmail ↔ 1 MSNV
+//   scores/{uid}      { msnv, name, lixi, quiz, memory, total, updatedAt, session, banned? }
+//   admins/{email}    {}                                  tạo tay trong Console
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+    function userDoc(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function employeeDoc(msnv) { return /databases/$(database)/documents/employees/$(msnv); }
+    function isAdmin() {
+      return signedIn() && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    // Khung giờ mở game (giờ VN = UTC+7) — giữ khớp với GAMES.openAt / closeAt trong config.js
+    function gameOpen() {
+      return request.time >= timestamp.date(2026, 10, 31) + duration.value(17, 'h')
+        && request.time < timestamp.date(2027, 1, 14) + duration.value(17, 'h');
+    }
+
+    // Trần điểm và thời gian chơi tối thiểu / tối đa của mỗi lượt — giữ khớp với GAMES.list
+    function maxScore(g) { return g == 'lixi' ? 64 : 100; }
+    function minSeconds(g) { return g == 'lixi' ? 30 : g == 'quiz' ? 15 : 8; }
+    function maxSeconds(g) { return 600; }
+
+    match /admins/{email} {
+      allow get: if signedIn() && request.auth.token.email == email;
+    }
+
+    match /employees/{msnv} {
+      allow get: if signedIn();
+      allow list, create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        // nhận MSNV: chỉ khi chưa ai nhận, và cùng batch với việc tạo users/{uid}
+        signedIn()
+        && resource.data.get('claimedBy', null) == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimedBy'])
+        && request.resource.data.claimedBy == request.auth.uid
+        && getAfter(userDoc(request.auth.uid)).data.msnv == msnv
+      );
+    }
+
+    match /users/{uid} {
+      allow get: if isMe(uid) || isAdmin();
+      allow list, delete: if isAdmin();
+      allow create: if isMe(uid)
+        && request.resource.data.keys().hasOnly(['msnv', 'email', 'createdAt'])
+        && request.resource.data.msnv is string
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.createdAt == request.time
+        && getAfter(employeeDoc(request.resource.data.msnv)).data.claimedBy == uid;
+    }
+
+    match /scores/{uid} {
+      // công khai để hiện Top 10 trên landing page
+      allow read: if true;
+      allow delete: if isAdmin();
+
+      allow create: if isMe(uid)
+        && request.resource.data.keys().hasOnly(['msnv', 'name', 'lixi', 'quiz', 'memory', 'total', 'updatedAt', 'session'])
+        && request.resource.data.msnv == getAfter(userDoc(uid)).data.msnv
+        && request.resource.data.name == get(employeeDoc(request.resource.data.msnv)).data.name
+        && request.resource.data.lixi == 0 && request.resource.data.quiz == 0 && request.resource.data.memory == 0
+        && request.resource.data.total == 0
+        && request.resource.data.session == null
+        && request.resource.data.updatedAt == request.time;
+
+      // bắt đầu lượt: server ghi lại thời điểm bắt đầu (request.time), không tin đồng hồ của máy
+      function isStart() {
+        let s = request.resource.data.session;
+        let old = resource.data.session;
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['session'])
+          && s.keys().hasOnly(['game', 'startedAt'])
+          && s.game in ['lixi', 'quiz', 'memory']
+          && s.startedAt == request.time
+          && (old == null || request.time > old.startedAt + duration.value(5, 's'));
+      }
+
+      // nộp điểm: chỉ khi đang có lượt, đã chơi đủ lâu, không vượt trần, và chỉ ghi khi phá kỷ lục
+      function isSubmit() {
+        return resource.data.session != null && submitOk(resource.data.session, resource.data.session.game);
+      }
+      function submitOk(old, g) {
+        let d = request.resource.data;
+        return d.diff(resource.data).affectedKeys().hasOnly([g, 'total', 'updatedAt', 'session'])
+          && d.session == null
+          && d.updatedAt == request.time
+          && d[g] is int && d[g] > resource.data[g] && d[g] <= maxScore(g)
+          && d.total == d.lixi + d.quiz + d.memory
+          && request.time >= old.startedAt + duration.value(minSeconds(g), 's')
+          && request.time <= old.startedAt + duration.value(maxSeconds(g), 's');
+      }
+
+      allow update: if isAdmin() || (isMe(uid) && !resource.data.get('banned', false) && gameOpen()
+        && (isStart() || isSubmit()));
+    }
+  }
+}
