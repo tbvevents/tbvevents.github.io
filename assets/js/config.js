@@ -38,7 +38,7 @@ export const FIREBASE = {
 
 // ⚠️ Thời gian và trần điểm cũng được ghi cứng trong firestore.rules — sửa ở đây thì sửa cả bên đó.
 export const GAMES = {
-  openAt: '2026-11-01T00:00:00+07:00',
+  openAt: '2026-10-28T00:00:00+07:00',
   closeAt: '2027-01-15T00:00:00+07:00',
   closeLabel: '23:59 ngày 14.01.2027',
   // true: hiện MSNV dạng 12***8 trên bảng xếp hạng
