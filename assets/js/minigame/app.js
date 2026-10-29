@@ -57,7 +57,7 @@ async function start() {
   if (inAppBrowser) $('#inapp-warn').hidden = false;
 
   /* ── đăng nhập ── */
-  $('#btn-login').addEventListener('click', async () => {
+  async function doLogin() {
     try {
       await api.signIn();
     } catch (err) {
@@ -67,7 +67,9 @@ async function start() {
       else toast('Đăng nhập không thành công. Vui lòng thử lại.');
       console.warn(err);
     }
-  });
+  }
+  $('#btn-login').addEventListener('click', doLogin);
+  $('#btn-top-login').addEventListener('click', doLogin);
   $('#btn-logout').addEventListener('click', () => api.logOut());
 
   api.onUser(async (user) => {
@@ -75,13 +77,14 @@ async function start() {
     stopScore = null;
     abortGame();
     closeRules?.();
+    // góc phải header: chưa đăng nhập → nút Đăng nhập; đã đăng nhập → email + Đăng xuất
+    $('#who').hidden = !user;
+    $('#btn-top-login').hidden = Boolean(user);
     if (!user) {
-      $('#who').hidden = true;
       show('login');
       return;
     }
     $('#who-email').textContent = user.email;
-    $('#who').hidden = false;
     try {
       profile = await api.getProfile(user.uid);
     } catch (err) {

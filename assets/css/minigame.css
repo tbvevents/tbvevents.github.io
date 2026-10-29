@@ -1,4 +1,6 @@
 /* Trang mini game — dùng chung token, .btn, .card, .leaderboard từ style.css */
+/* JS ẩn/hiện các màn bằng thuộc tính hidden: không để quy tắc display nào (.play, .who…) đè lên nó */
+[hidden] { display: none !important; }
 .mg { min-height: 100vh; min-height: 100svh; }
 .mg-top {
   display: flex;
