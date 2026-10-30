@@ -227,9 +227,11 @@ export const S = {
     'Catch the Lucky Money play area: drag your finger or use the arrow keys to move the basket',
   ],
   'archery.aria': [
-    'Khu vực chơi Bắn cung: chạm và kéo để nhắm, thả tay để bắn; hoặc dùng phím mũi tên để nhắm và phím cách để bắn',
-    'Archery play area: touch and drag to aim, release to shoot; or use the arrow keys to aim and Space to shoot',
+    'Khu vực chơi Bắn cung: chạm và kéo để di chuyển tâm ngắm, thả tay để bắn; hoặc dùng phím mũi tên để nhắm và phím cách để bắn',
+    'Archery play area: touch and drag to move the crosshair, release to shoot; or use the arrow keys to aim and Space to shoot',
   ],
   'archery.wind': ['Gió', 'Wind'],
   'archery.miss': ['Trượt!', 'Miss!'],
+  'archery.bull': ['Hồng tâm!', 'Bullseye!'],
+  'archery.hint': ['Chạm và kéo để nhắm', 'Touch and drag to aim'],
 };

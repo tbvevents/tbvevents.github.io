@@ -196,7 +196,7 @@ body.is-playing .mg-main { padding-top: max(10px, env(safe-area-inset-top, 0px))
 @keyframes pop { from { transform: scale(1.6); opacity: 0; } 30% { opacity: 1; } to { transform: scale(1); opacity: 0.9; } }
 
 .lixi-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: ew-resize; }
-.archery-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none; }
+.archery-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
 
 .quiz { padding: clamp(18px, 4vw, 32px); align-self: start; overflow-y: auto; max-height: 100%; width: min(720px, 100%); justify-self: center; }
 .quiz-count { margin: 0 0 8px; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }

@@ -112,13 +112,13 @@ export const GAMES = {
       rules: {
         vi: [
           'Bạn có 5 lượt bắn, mỗi lượt 10 giây.',
-          'Chạm vào màn hình, kéo để nhắm mục tiêu và thả tay để bắn.',
+          'Chạm vào màn hình, kéo để di chuyển tâm ngắm và thả tay để bắn.',
           'Hồng tâm 10 điểm, giảm dần ra các vòng ngoài. Ra ngoài bia hoặc trượt: 0 điểm.',
           'Cẩn thận với gió (ngẫu nhiên mỗi lượt)! Tối đa 50 điểm.',
         ],
         en: [
           'You have 5 shots, 10 seconds each.',
-          'Touch the screen, drag to aim and release to shoot.',
+          'Touch the screen, drag to move the crosshair and release to shoot.',
           'The bullseye is 10 points, fewer for each ring outward. Outside the target or a miss: 0 points.',
           'Watch out for the wind (random each shot)! 50 points maximum.',
         ],

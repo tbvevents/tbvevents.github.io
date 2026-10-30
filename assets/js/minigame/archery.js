@@ -1,16 +1,63 @@
 // Bắn cung: 5 mũi tên, chạm-kéo để nhắm, thả để bắn. Gió ngẫu nhiên mỗi mũi đẩy lệch ngang.
 // Vòng trong cùng 10 điểm, giảm dần 1 điểm mỗi vòng; ra ngoài bia 0 điểm → tối đa 50,
 // khớp với trần điểm trong firestore.rules.
+//
+// Cảnh vẽ phối cảnh 3D đơn giản: mỗi vật có toạ độ thế giới (X, Y, z) tính theo bán kính bia R0,
+// bia ở z = 1, điểm tụ là tâm bia. Khi nhắm, camera tiến tới (cam: 0 → camMax) nên vật gần phóng nhanh,
+// vật xa gần như đứng yên (parallax). Mọi chuyển động tính theo dt nên mượt ở mọi tần số màn hình.
 import * as sfx from './sounds.js';
-import { t } from '../i18n.js';
+import { t, getLang } from '../i18n.js';
 
 const ARROWS = 5;
 const SHOT_SECONDS = 10;
-const FLIGHT = 0.55; // giây mũi tên bay
-const PAUSE = 0.85; // giây xem kết quả trước mũi kế tiếp
+const FLIGHT = 0.5; // giây mũi tên bay
+const HOLD = 0.6; // giây giữ góc nhìn gần sau khi mũi tên cắm
+const PAUSE = 1.15; // giây từ lúc cắm tới mũi kế tiếp (gồm cả lúc camera lùi ra)
 const MAX_WIND = 5;
+const GROUND = 1.65; // mặt đất nằm dưới tâm bia bao nhiêu bán kính bia
 // màu 10 vòng từ ngoài vào trong: trắng, đen, xanh, đỏ, vàng (mỗi màu 2 vòng)
-const RING_COLORS = ['#f4efe6', '#f4efe6', '#2a2a2e', '#2a2a2e', '#2f7fd8', '#2f7fd8', '#d8202e', '#d8202e', '#ffcf4a', '#ffcf4a'];
+const RING_COLORS = ['#f4efe6', '#f4efe6', '#2b2f3a', '#2b2f3a', '#2f8fe0', '#2f8fe0', '#e8333a', '#e8333a', '#ffcf3a', '#ffcf3a'];
+const INK = '#1d1d1f';
+
+// số giả ngẫu nhiên cố định để cảnh giống nhau mọi lần chơi
+const rnd = (i) => {
+  const x = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+// cây cối theo toạ độ thế giới; s = bề ngang tán cây (đơn vị bán kính bia)
+const SCENERY = (() => {
+  const out = [];
+  let i = 0;
+  for (let X = -40; X <= 40; X += 3.3) {
+    const j = i++;
+    if (Math.abs(X) < 1.4) continue;
+    out.push({ kind: rnd(j) < 0.22 ? 'blossom' : 'tree', X: X + (rnd(j + 50) - 0.5) * 1.2, z: 2.2 + rnd(j + 100) * 1.1, s: 2.2 + rnd(j + 150) * 1.4 });
+  }
+  out.push(
+    { kind: 'bush', X: -2.5, z: 1.15, s: 1.5 },
+    { kind: 'bush', X: 2.7, z: 1.1, s: 1.3 },
+    { kind: 'tree', X: -4.4, z: 1.4, s: 3.4, lanterns: true },
+    { kind: 'blossom', X: 4.7, z: 1.5, s: 3.2, lanterns: true },
+    { kind: 'tree', X: -11, z: 1.2, s: 4.4 },
+    { kind: 'blossom', X: 11.5, z: 1.25, s: 4.2, lanterns: true },
+    { kind: 'bush', X: -3.4, z: 0.92, s: 1.6 },
+    { kind: 'bush', X: 3.7, z: 0.9, s: 1.8 },
+    { kind: 'tree', X: -5.6, z: 0.72, s: 4 },
+    { kind: 'blossom', X: 6.2, z: 0.7, s: 3.8 },
+  );
+  return out.sort((a, b) => b.z - a.z);
+})();
+const HEDGE_Z = 3.6;
+const MOUNTAINS = [
+  { x: -0.08, wd: 0.78, ht: 0.95, c: '#ace5ec' },
+  { x: 0.48, wd: 0.66, ht: 0.8, c: '#ace5ec' },
+  { x: 0.16, wd: 0.5, ht: 0.62, c: '#93d9e3' },
+  { x: 0.66, wd: 0.5, ht: 0.55, c: '#93d9e3' },
+];
+const CLOUDS = [
+  { x: 0.12, y: 0.16, s: 1 }, { x: 0.58, y: 0.08, s: 0.8 }, { x: 0.86, y: 0.26, s: 1.1 }, { x: 0.36, y: 0.3, s: 0.65 },
+];
 
 export function play(stage, hud, signal) {
   return new Promise((resolve) => {
@@ -19,62 +66,104 @@ export function play(stage, hud, signal) {
     canvas.setAttribute('aria-label', t('archery.aria'));
     stage.appendChild(canvas);
     const ctx = canvas.getContext('2d');
+    const reduceMotion = matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-    let w = 0, h = 0, dpr = 1;
+    // bố cục, tính lại mỗi khi canvas đổi kích thước (xoay máy, thanh địa chỉ co giãn…)
+    let w = 0, h = 0, dpr = 1, m = 0;
+    let R0 = 0; // bán kính bia khi chưa nhắm (px)
+    let F = { x: 0, y: 0 }; // tâm bia = điểm tụ
+    let ZMAX = 1, camMax = 0;
+    let sky = null;
     const resize = () => {
       dpr = Math.min(devicePixelRatio || 1, 2);
       w = canvas.clientWidth;
       h = canvas.clientHeight;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
+      if (!w || !h) return;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      m = Math.min(w, h);
+      R0 = m * 0.075;
+      F = { x: w / 2, y: h * 0.42 };
+      // giá bia (cao 2.6 bán kính) phóng to vẫn nằm dưới huy hiệu gió và không bị cung che
+      ZMAX = Math.max(2.5, Math.min(w * 0.36, h * 0.24) / R0);
+      camMax = 1 - 1 / ZMAX;
+      sky = ctx.createLinearGradient(0, 0, 0, F.y);
+      sky.addColorStop(0, '#bfeef4');
+      sky.addColorStop(1, '#e9fcfb');
     };
     resize();
-    addEventListener('resize', resize);
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(resize) : null;
+    if (ro) ro.observe(canvas);
+    else addEventListener('resize', resize);
 
-    // toạ độ bia tính lại mỗi khung hình theo kích thước canvas; điểm chạm lưu tương đối theo bia
-    const target = () => {
-      const r = Math.max(60, Math.min(w * 0.42, h * 0.3));
-      return { x: w / 2, y: Math.max(r + 56, h * 0.4), r };
+    let cam = 0; // vị trí camera trên trục z
+    /** Chiếu điểm thế giới ra màn hình: [x, y, px trên mỗi đơn vị bán kính bia]. */
+    const proj = (X, Y, z) => {
+      const s = R0 / Math.max(0.001, z - cam);
+      return [F.x + X * s, F.y + Y * s, s];
     };
-    const bow = () => ({ x: w / 2, y: h - 46 });
+    const groundY = (z) => (z - cam <= 0.004 ? h * 4 : F.y + (GROUND * R0) / (z - cam));
 
-    const newWind = () => Math.round((Math.random() * 2 - 1) * MAX_WIND);
+    const newWind = () => Math.round((Math.random() * 2 - 1) * MAX_WIND * 10) / 10;
+    // mỗi mũi bắt đầu với tâm ngắm lệch khỏi bia → phải kéo để nhắm
+    const newAim = () => {
+      const a = Math.random() * Math.PI * 2, r = 0.7 + Math.random() * 0.6;
+      return { u: Math.cos(a) * r, v: Math.sin(a) * r };
+    };
     let wind = newWind();
     let shot = 0; // số mũi đã bắn
     let score = 0;
+    const shotPoints = [];
     let state = 'ready'; // ready | flying | pause | done
-    let stateAt = 0; // thời điểm bắt đầu trạng thái hiện tại (giây)
-    let clockStart = 0; // đồng hồ bắn của mũi hiện tại
+    let stateAt = 0;
+    let clockStart = 0;
     let lastSec = SHOT_SECONDS;
-    const hits = []; // { u, v } theo bán kính bia (0,0 = hồng tâm)
-    let flight = null; // { u, v, points }
+    let touched = false; // ẩn gợi ý sau lần chạm đầu
+    let timedOut = false; // mũi vừa rồi hết giờ chưa bắn
+    const hits = []; // điểm cắm trên mặt bia, đơn vị bán kính bia
+    let flight = null;
     const floats = [];
+    const sparks = [];
+    let shake = 0;
+    let recoil = 0;
+    let pose = 0; // 0 = cầm cung thả lỏng, 1 = đang kéo dây
 
-    // nhắm: tâm ngắm nằm phía trên ngón tay để ngón tay không che bia
-    const aim = { on: false, x: 0, y: 0, pointer: null };
-    const lift = () => Math.min(90, h * 0.14);
-    const setAim = (clientX, clientY) => {
-      const r = canvas.getBoundingClientRect();
-      aim.x = Math.min(w, Math.max(0, clientX - r.left));
-      aim.y = Math.min(h, Math.max(0, clientY - r.top - lift()));
-    };
+    const aim = { on: false, pointer: null, ...newAim(), lx: 0, ly: 0 };
     // rung tay nhẹ để không thể đặt cứng tâm ngắm vào hồng tâm
-    const sway = (time) => {
-      const a = target().r * 0.07;
-      return { x: Math.sin(time * 1.9) * a + Math.sin(time * 4.3) * a * 0.35, y: Math.cos(time * 2.4) * a * 0.8 };
+    const sway = (time) => ({
+      u: Math.sin(time * 1.9) * 0.07 + Math.sin(time * 4.3) * 0.025,
+      v: Math.cos(time * 2.4) * 0.056,
+    });
+    const clampAim = () => {
+      aim.u = Math.max(-2, Math.min(2, aim.u));
+      aim.v = Math.max(-2, Math.min(2, aim.v));
     };
 
+    const startAim = (pointer) => {
+      aim.on = true;
+      aim.pointer = pointer;
+      touched = true;
+      sfx.drawBow();
+    };
     const onDown = (e) => {
       if (state !== 'ready' || aim.on) return;
       e.preventDefault();
-      aim.on = true;
-      aim.pointer = e.pointerId;
-      canvas.setPointerCapture?.(e.pointerId);
-      setAim(e.clientX, e.clientY);
-      sfx.drawBow();
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* bỏ qua */ }
+      aim.lx = e.clientX;
+      aim.ly = e.clientY;
+      startAim(e.pointerId);
     };
-    const onMove = (e) => { if (aim.on && e.pointerId === aim.pointer) setAim(e.clientX, e.clientY); };
+    // kéo tương đối: tâm ngắm đi đúng quãng ngón tay đi trên bia đã phóng to
+    const onMove = (e) => {
+      if (!aim.on || e.pointerId !== aim.pointer) return;
+      const k = R0 * ZMAX;
+      aim.u += (e.clientX - aim.lx) / k;
+      aim.v += (e.clientY - aim.ly) / k;
+      aim.lx = e.clientX;
+      aim.ly = e.clientY;
+      clampAim();
+    };
     const onUp = (e) => {
       if (!aim.on || e.pointerId !== aim.pointer) return;
       aim.on = false;
@@ -87,23 +176,18 @@ export function play(stage, hud, signal) {
       const k = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }[e.key];
       if (k) {
         keys[k] = down;
-        if (down && !aim.on && state === 'ready') {
-          const tg = target();
-          aim.on = true;
-          aim.pointer = 'key';
-          aim.x = tg.x;
-          aim.y = tg.y + tg.r * 1.4;
-          sfx.drawBow();
-        }
+        if (down && !aim.on && state === 'ready') startAim('key');
       } else if ((e.key === ' ' || e.key === 'Enter') && down) {
         if (aim.on && aim.pointer === 'key') { aim.on = false; fire(); }
       } else return;
       e.preventDefault();
     };
+    const noMenu = (e) => e.preventDefault();
     canvas.addEventListener('pointerdown', onDown);
     canvas.addEventListener('pointermove', onMove);
     canvas.addEventListener('pointerup', onUp);
     canvas.addEventListener('pointercancel', onUp);
+    canvas.addEventListener('contextmenu', noMenu);
     addEventListener('keydown', onKey);
     addEventListener('keyup', onKey);
 
@@ -114,6 +198,7 @@ export function play(stage, hud, signal) {
 
     const cleanup = () => {
       cancelAnimationFrame(raf);
+      ro?.disconnect();
       removeEventListener('resize', resize);
       removeEventListener('keydown', onKey);
       removeEventListener('keyup', onKey);
@@ -123,15 +208,17 @@ export function play(stage, hud, signal) {
 
     function fire() {
       if (state !== 'ready') return;
-      const tg = target();
       const s = sway(now);
       // gió đẩy lệch ngang tới ~0.45 bán kính bia ở cấp mạnh nhất, kèm lệch nhỏ ngẫu nhiên
-      const x = aim.x + s.x + wind * tg.r * 0.09 + (Math.random() - 0.5) * tg.r * 0.04;
-      const y = aim.y + s.y + (Math.random() - 0.5) * tg.r * 0.04;
-      const u = (x - tg.x) / tg.r;
-      const v = (y - tg.y) / tg.r;
+      const u = aim.u + s.u + wind * 0.09 + (Math.random() - 0.5) * 0.04;
+      const v = aim.v + s.v + (Math.random() - 0.5) * 0.04;
       const d = Math.hypot(u, v);
-      flight = { u, v, points: d >= 1 ? 0 : 10 - Math.floor(d * 10) };
+      // điểm xuất phát: chỗ mũi tên nằm trên cung, quy về toạ độ thế giới ngay trước camera
+      const [bx, by] = arrowRest();
+      const z0 = cam + 0.14;
+      flight = { u, v, points: d >= 1 ? 0 : 10 - Math.floor(d * 10), x0: ((bx - F.x) / R0) * 0.14, y0: ((by - F.y) / R0) * 0.14, z0 };
+      timedOut = false;
+      recoil = 1;
       setState('flying');
       sfx.release();
     }
@@ -139,21 +226,37 @@ export function play(stage, hud, signal) {
     /** Hết giờ mà chưa bắn: mũi đó 0 điểm. */
     function timeout() {
       aim.on = false;
-      flight = null;
+      timedOut = true;
       land({ u: null, v: null, points: 0 });
     }
 
     function land(f) {
       shot++;
       score += f.points;
+      shotPoints.push(f.points);
       hud.score(score);
-      const tg = target();
-      if (f.u !== null) hits.push({ u: f.u, v: f.v });
-      const fx = f.u === null ? tg.x : tg.x + f.u * tg.r;
-      const fy = f.u === null ? tg.y : tg.y + f.v * tg.r;
-      floats.push({ x: Math.min(w - 40, Math.max(40, fx)), y: Math.min(h - 60, Math.max(40, fy - 20)), text: f.points ? `+${f.points}` : t('archery.miss'), bad: !f.points, life: 1 });
-      if (f.points) sfx.hit(f.points);
-      else sfx.miss();
+      // mũi trúng giá gỗ / mặt bia thì cắm lại; bay quá giá thì mất
+      if (f.u !== null && Math.abs(f.u) <= 1.25 && f.v >= -1.3 && f.v <= 1.3) hits.push({ u: f.u, v: f.v });
+      const [fx, fy] = f.u === null ? [F.x, F.y] : proj(f.u, f.v, 1);
+      const bull = f.points === 10;
+      floats.push({
+        x: Math.min(w - 60, Math.max(60, fx)),
+        y: Math.min(h - 80, Math.max(70, fy - 24)),
+        text: f.points ? `+${f.points}` : t('archery.miss'),
+        sub: bull ? t('archery.bull') : '',
+        bad: !f.points,
+        life: 1,
+      });
+      if (f.points) {
+        sfx.hit(f.points);
+        if (bull) {
+          if (!reduceMotion) shake = 0.4;
+          for (let i = 0; i < 26; i++) {
+            const a = Math.random() * Math.PI * 2, sp = (0.4 + Math.random()) * m * 0.5;
+            sparks.push({ x: fx, y: fy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - m * 0.2, life: 1, c: i % 3 ? '#ffcf3a' : '#ff6b6b' });
+          }
+        }
+      } else sfx.miss();
       setState(shot >= ARROWS ? 'done' : 'pause');
     }
 
@@ -162,15 +265,22 @@ export function play(stage, hud, signal) {
       stateAt = now;
     }
 
+    // cánh hoa đào bay theo gió (trang trí + gợi ý hướng gió)
+    const petals = reduceMotion ? [] : Array.from({ length: 16 }, (_, i) => ({ x: rnd(i + 300), y: rnd(i + 400), r: 0.6 + rnd(i + 500) * 0.6, ph: rnd(i + 600) * 6 }));
+    let cloudDx = 0;
+
     function frame(ts) {
       const dt = Math.min((ts - last) / 1000, 0.05);
       last = ts;
       now = (ts - t0) / 1000;
+      if (!w || !h) { raf = requestAnimationFrame(frame); return; }
 
-      if (keys.left) aim.x = Math.max(0, aim.x - dt * 220);
-      if (keys.right) aim.x = Math.min(w, aim.x + dt * 220);
-      if (keys.up) aim.y = Math.max(0, aim.y - dt * 220);
-      if (keys.down) aim.y = Math.min(h, aim.y + dt * 220);
+      const ks = dt * 1.3;
+      if (keys.left) aim.u -= ks;
+      if (keys.right) aim.u += ks;
+      if (keys.up) aim.v -= ks;
+      if (keys.down) aim.v += ks;
+      clampAim();
 
       if (state === 'ready') {
         const left = Math.max(0, SHOT_SECONDS - (now - clockStart));
@@ -187,6 +297,7 @@ export function play(stage, hud, signal) {
         land(f);
       } else if (state === 'pause' && now - stateAt >= PAUSE) {
         wind = newWind();
+        Object.assign(aim, newAim());
         clockStart = now;
         lastSec = SHOT_SECONDS;
         setState('ready');
@@ -196,206 +307,74 @@ export function play(stage, hud, signal) {
         return;
       }
 
-      draw();
+      // camera tiến vào khi nhắm / mũi tên đang bay / vừa cắm, lùi ra khi chờ mũi kế tiếp
+      // (hết giờ không bắn thì không cần giữ góc nhìn gần)
+      const close = (state === 'ready' && aim.on) || state === 'flying'
+        || ((state === 'pause' || state === 'done') && now - stateAt < HOLD && !timedOut);
+      cam += ((close ? camMax : 0) - cam) * (1 - Math.exp(-dt * 7));
+      pose += ((state === 'ready' && aim.on ? 1 : 0) - pose) * (1 - Math.exp(-dt * 10));
+      recoil *= Math.exp(-dt * 6);
+      shake = Math.max(0, shake - dt);
+      cloudDx += wind * dt * m * 0.012;
+
+      draw(dt);
       raf = requestAnimationFrame(frame);
     }
 
-    function draw() {
-      ctx.clearRect(0, 0, w, h);
-      const tg = target();
-      drawTarget(tg);
-      for (const p of hits) drawStuck(tg.x + p.u * tg.r, tg.y + p.v * tg.r);
-      drawBow(bow(), aim.on && state === 'ready');
-      if (state === 'flying' && flight) drawFlying(tg);
+    /* ───────── vẽ ───────── */
+    function draw(dt) {
+      const zp = camMax ? cam / camMax : 0; // 0..1 mức tiến vào
+      ctx.save();
+      if (shake > 0) ctx.translate((Math.random() - 0.5) * 14 * shake, (Math.random() - 0.5) * 10 * shake);
+
+      // trời, mây, núi: rất xa nên chỉ nhích nhẹ quanh điểm tụ
+      ctx.fillStyle = sky;
+      ctx.fillRect(-20, -20, w + 40, h + 40);
+      const far = 1 + 0.05 * zp;
+      ctx.save();
+      ctx.translate(F.x, F.y);
+      ctx.scale(far, far);
+      ctx.translate(-F.x, -F.y);
+      drawClouds();
+      drawMountains();
+      ctx.restore();
+
+      // cỏ: từ chân hàng rào cây xa xuống, kèm các dải cỏ cắt chạy theo camera
+      const hedgeBase = groundY(HEDGE_Z);
+      ctx.fillStyle = '#74c943';
+      ctx.fillRect(-20, hedgeBase - 2, w + 40, h - hedgeBase + 40);
+      ctx.fillStyle = '#80d24e';
+      for (const [z1, z2] of [[1.6, 1.25], [0.95, 0.75], [0.58, 0.46], [0.36, 0.29], [0.23, 0.185]]) {
+        const y1 = groundY(z1), y2 = Math.min(h + 20, groundY(z2));
+        if (y1 < h) ctx.fillRect(-20, y1, w + 40, y2 - y1);
+      }
+      drawHedge();
+
+      // vật sau bia → vạch kẻ → bia → vật trước bia
+      for (const o of SCENERY) if (o.z > 1) drawThing(o);
+      drawLanes();
+      drawTarget();
+      for (const o of SCENERY) if (o.z <= 1) drawThing(o);
+      if (state === 'flying' && flight) drawFlying();
+
+      drawPetals(dt);
       if (aim.on && state === 'ready') {
         const s = sway(now);
-        drawCrosshair(aim.x + s.x, aim.y + s.y);
+        const [x, y, sc] = proj(aim.u + s.u, aim.v + s.v, 1);
+        drawCrosshair(x, y, Math.max(10, Math.min(26, sc * 0.2)));
       }
-      drawWind();
-      drawQuiver();
-      for (const f of floats) {
-        if (f.life <= 0) continue;
-        f.life -= 1 / 60;
-        f.y -= 0.6;
-        ctx.globalAlpha = Math.max(0, f.life);
-        ctx.fillStyle = f.bad ? '#ff6b6b' : '#ffe7a3';
-        ctx.font = '800 26px "Be Vietnam Pro", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(f.text, f.x, f.y);
-        ctx.globalAlpha = 1;
-      }
-    }
-
-    function drawTarget({ x, y, r }) {
-      // chân giá đỡ
-      ctx.strokeStyle = '#7a4a22';
-      ctx.lineWidth = Math.max(4, r * 0.06);
-      ctx.beginPath();
-      ctx.moveTo(x - r * 0.5, y + r * 0.6);
-      ctx.lineTo(x - r * 0.75, y + r * 1.35);
-      ctx.moveTo(x + r * 0.5, y + r * 0.6);
-      ctx.lineTo(x + r * 0.75, y + r * 1.35);
-      ctx.stroke();
-      for (let i = 0; i < 10; i++) {
-        const rr = r * (1 - i / 10);
-        ctx.fillStyle = RING_COLORS[i];
-        ctx.beginPath();
-        ctx.arc(x, y, rr, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = i === 2 || i === 3 ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.beginPath();
-      ctx.arc(x, y, Math.max(1.5, r * 0.012), 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    function drawStuck(x, y) {
-      // mũi tên cắm trên bia nhìn từ phía sau: đuôi lông vũ chĩa xuống phải
-      ctx.strokeStyle = '#5a3a1a';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + 10, y + 16);
-      ctx.stroke();
-      ctx.fillStyle = '#c8102e';
-      ctx.beginPath();
-      ctx.moveTo(x + 8, y + 13);
-      ctx.lineTo(x + 16, y + 14);
-      ctx.lineTo(x + 12, y + 22);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#1b0b14';
-      ctx.beginPath();
-      ctx.arc(x, y, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    function drawFlying(tg) {
-      const b = bow();
-      const p = Math.min(1, (now - stateAt) / FLIGHT);
-      const e = 1 - (1 - p) * (1 - p);
-      const tx = tg.x + flight.u * tg.r;
-      const ty = tg.y + flight.v * tg.r;
-      // quỹ đạo hơi vồng lên, mũi tên nhỏ dần khi bay xa
-      const x = b.x + (tx - b.x) * e;
-      const y = b.y + (ty - b.y) * e - Math.sin(p * Math.PI) * tg.r * 0.25;
-      const len = 46 * (1 - e * 0.65);
-      const ang = Math.atan2(ty - b.y, tx - b.x);
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(ang);
-      ctx.strokeStyle = '#5a3a1a';
-      ctx.lineWidth = 3 * (1 - e * 0.5);
-      ctx.beginPath();
-      ctx.moveTo(-len, 0);
-      ctx.lineTo(0, 0);
-      ctx.stroke();
-      ctx.fillStyle = '#c0c4cc';
-      ctx.beginPath();
-      ctx.moveTo(4, 0);
-      ctx.lineTo(-4, -3);
-      ctx.lineTo(-4, 3);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#c8102e';
-      ctx.fillRect(-len, -3, len * 0.22, 6);
       ctx.restore();
+
+      drawBow();
+      drawSparks(dt);
+      drawFloats(dt);
+      drawWind();
+      drawShots();
+      if (!touched) drawHint();
     }
 
-    function drawBow({ x, y }, drawn) {
-      const s = Math.max(70, Math.min(w * 0.22, 120));
-      const pull = drawn ? 22 : 0;
-      ctx.strokeStyle = '#ffcf4a';
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.moveTo(x - s / 2, y + 8);
-      ctx.quadraticCurveTo(x, y - 34, x + s / 2, y + 8);
-      ctx.stroke();
-      ctx.strokeStyle = 'rgba(255,246,230,0.85)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(x - s / 2, y + 8);
-      ctx.lineTo(x, y + 8 + pull);
-      ctx.lineTo(x + s / 2, y + 8);
-      ctx.stroke();
-      if (drawn) {
-        ctx.strokeStyle = '#5a3a1a';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(x, y + 8 + pull);
-        ctx.lineTo(x, y - 30);
-        ctx.stroke();
-      }
-    }
-
-    function drawCrosshair(x, y) {
-      ctx.strokeStyle = '#fff6e6';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(x, y, 14, 0, Math.PI * 2);
-      ctx.moveTo(x - 22, y);
-      ctx.lineTo(x - 6, y);
-      ctx.moveTo(x + 6, y);
-      ctx.lineTo(x + 22, y);
-      ctx.moveTo(x, y - 22);
-      ctx.lineTo(x, y - 6);
-      ctx.moveTo(x, y + 6);
-      ctx.lineTo(x, y + 22);
-      ctx.stroke();
-    }
-
-    function drawWind() {
-      const x = 16, y = 26;
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      roundRect(x - 8, y - 18, 138, 30, 10);
-      ctx.fill();
-      ctx.fillStyle = '#ffe7a3';
-      ctx.font = '600 14px "Be Vietnam Pro", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(`${t('archery.wind')} ${Math.abs(wind)}`, x, y + 2);
-      if (!wind) return;
-      // mũi tên chỉ hướng gió, dài theo độ mạnh
-      const ax = x + 92, len = 8 + Math.abs(wind) * 5, dir = Math.sign(wind);
-      const x0 = ax - (dir * len) / 2, x1 = ax + (dir * len) / 2;
-      ctx.strokeStyle = '#ffe7a3';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(x0, y - 3);
-      ctx.lineTo(x1, y - 3);
-      ctx.moveTo(x1 - dir * 6, y - 9);
-      ctx.lineTo(x1, y - 3);
-      ctx.lineTo(x1 - dir * 6, y + 3);
-      ctx.stroke();
-    }
-
-    function drawQuiver() {
-      // các mũi còn lại sáng, đã bắn thì mờ
-      for (let i = 0; i < ARROWS; i++) {
-        const x = w - 20 - i * 14, y = 12;
-        ctx.globalAlpha = i < ARROWS - shot ? 1 : 0.25;
-        ctx.strokeStyle = '#ffe7a3';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x, y + 26);
-        ctx.stroke();
-        ctx.fillStyle = '#c8102e';
-        ctx.fillRect(x - 3, y + 20, 6, 8);
-        ctx.fillStyle = '#c0c4cc';
-        ctx.beginPath();
-        ctx.moveTo(x, y - 4);
-        ctx.lineTo(x - 3, y + 2);
-        ctx.lineTo(x + 3, y + 2);
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
-
-    function roundRect(x, y, rw, rh, r) {
+    function rr(x, y, rw, rh, r) {
+      r = Math.min(r, rw / 2, rh / 2);
       ctx.beginPath();
       ctx.moveTo(x + r, y);
       ctx.arcTo(x + rw, y, x + rw, y + rh, r);
@@ -403,6 +382,485 @@ export function play(stage, hud, signal) {
       ctx.arcTo(x, y + rh, x, y, r);
       ctx.arcTo(x, y, x + rw, y, r);
       ctx.closePath();
+    }
+    const ink = (sc) => Math.max(1.5, Math.min(4, sc * 0.05));
+
+    function drawClouds() {
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      const span = w * 1.4;
+      for (const c of CLOUDS) {
+        const s = m * 0.13 * c.s;
+        let x = ((c.x * w + cloudDx) % span + span) % span - w * 0.2;
+        const y = F.y * c.y;
+        ctx.beginPath();
+        ctx.arc(x, y, s * 0.32, 0, Math.PI * 2);
+        ctx.arc(x + s * 0.34, y - s * 0.12, s * 0.4, 0, Math.PI * 2);
+        ctx.arc(x + s * 0.72, y, s * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        rr(x, y - s * 0.05, s * 0.72, s * 0.35, s * 0.17);
+        ctx.fill();
+      }
+    }
+
+    function drawMountains() {
+      const base = F.y + R0 * 0.4;
+      for (const mt of MOUNTAINS) {
+        const x0 = mt.x * w, x1 = x0 + mt.wd * w, top = base - mt.ht * F.y;
+        ctx.fillStyle = mt.c;
+        ctx.beginPath();
+        ctx.moveTo(x0, base);
+        ctx.lineTo((x0 + x1) / 2, top);
+        ctx.lineTo(x1, base);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    function drawHedge() {
+      const [, yb, s] = proj(0, GROUND, HEDGE_Z);
+      const r = 0.9 * s;
+      ctx.fillStyle = '#3cae46';
+      ctx.beginPath();
+      for (let X = -60; X <= 60; X += 1.5) {
+        const x = F.x + X * s;
+        if (x < -r || x > w + r) continue;
+        const rj = r * (0.85 + rnd(X * 3 + 900) * 0.4);
+        ctx.moveTo(x + rj, yb - rj * 0.9);
+        ctx.arc(x, yb - rj * 0.9, rj, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      ctx.fillRect(-20, yb - r, w + 40, r + 2);
+    }
+
+    function drawThing(o) {
+      if (o.z - cam < 0.05) return; // đã lướt qua camera
+      const [x, yb, sc] = proj(o.X, GROUND, o.z);
+      const S = o.s * sc;
+      if (x + S < -10 || x - S > w + 10 || yb - S * 1.5 > h) return;
+      if (o.kind === 'bush') {
+        ctx.fillStyle = '#35a845';
+        ctx.beginPath();
+        ctx.arc(x - S * 0.26, yb - S * 0.22, S * 0.26, 0, Math.PI * 2);
+        ctx.arc(x + S * 0.26, yb - S * 0.22, S * 0.26, 0, Math.PI * 2);
+        ctx.arc(x, yb - S * 0.36, S * 0.33, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(x - S * 0.5, yb - S * 0.22, S, S * 0.22);
+        ctx.fillStyle = '#5cc94f';
+        ctx.beginPath();
+        ctx.arc(x - S * 0.08, yb - S * 0.48, S * 0.11, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+      const blossom = o.kind === 'blossom';
+      const trunkH = S * 0.72, canH = S * 0.62, top = yb - trunkH - canH;
+      // thân và cành
+      ctx.fillStyle = '#a65a42';
+      ctx.fillRect(x - S * 0.08, yb - trunkH - canH * 0.2, S * 0.16, trunkH + canH * 0.2);
+      ctx.fillRect(x, yb - trunkH * 0.62, S * 0.3, S * 0.07);
+      ctx.fillRect(x + S * 0.23, yb - trunkH * 0.95, S * 0.07, trunkH * 0.38);
+      // tán
+      ctx.fillStyle = blossom ? '#f08cb6' : '#2fb24a';
+      rr(x - S / 2, top, S, canH, S * 0.12);
+      ctx.fill();
+      ctx.fillStyle = blossom ? '#ffc4dc' : '#6fd04c';
+      rr(x - S * 0.38, top + canH * 0.14, S * 0.22, canH * 0.18, S * 0.05);
+      ctx.fill();
+      rr(x + S * 0.02, top + canH * 0.1, S * 0.32, canH * 0.28, S * 0.06);
+      ctx.fill();
+      if (o.lanterns) {
+        for (const [dx, len] of [[-0.3, 0.12], [0.3, 0.2]]) {
+          const lx = x + S * dx, ly = top + canH + S * len;
+          ctx.strokeStyle = INK;
+          ctx.lineWidth = Math.max(1, S * 0.01);
+          ctx.beginPath();
+          ctx.moveTo(lx, top + canH);
+          ctx.lineTo(lx, ly - S * 0.07);
+          ctx.stroke();
+          ctx.fillStyle = '#e8202e';
+          ctx.beginPath();
+          ctx.ellipse(lx, ly, S * 0.065, S * 0.08, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#ffcf3a';
+          ctx.fillRect(lx - S * 0.035, ly - S * 0.09, S * 0.07, S * 0.025);
+          ctx.fillRect(lx - S * 0.035, ly + S * 0.068, S * 0.07, S * 0.025);
+        }
+      }
+    }
+
+    function drawLanes() {
+      const zn = cam + 0.02;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      for (const [X, hw] of [[0, 0.07], [-1.7, 0.05], [1.7, 0.05]]) {
+        const a = proj(X - hw, GROUND, 1), b = proj(X + hw, GROUND, 1);
+        const c = proj(X + hw, GROUND, zn), d = proj(X - hw, GROUND, zn);
+        ctx.beginPath();
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+        ctx.lineTo(c[0], c[1]);
+        ctx.lineTo(d[0], d[1]);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    function drawTarget() {
+      const [cx, cy, s] = proj(0, 0, 1);
+      const lw = ink(s);
+      ctx.lineWidth = lw;
+      ctx.strokeStyle = INK;
+      // bóng dưới chân
+      ctx.fillStyle = 'rgba(20,70,20,0.25)';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + GROUND * s, 1.5 * s, 0.12 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // chân giá
+      ctx.fillStyle = '#7e4630';
+      for (const dx of [-0.95, 0.67]) {
+        rr(cx + dx * s, cy + 1.2 * s, 0.28 * s, (GROUND - 1.2) * s, 0.05 * s);
+        ctx.fill();
+        ctx.stroke();
+      }
+      // giá gỗ vân sọc
+      rr(cx - 1.25 * s, cy - 1.3 * s, 2.5 * s, 2.6 * s, 0.1 * s);
+      ctx.fillStyle = '#a3613f';
+      ctx.fill();
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = '#8d4f33';
+      for (let i = 0; i < 6; i++) ctx.fillRect(cx + (-1.1 + i * 0.42) * s, cy - 1.3 * s, 0.1 * s, 2.6 * s);
+      ctx.restore();
+      ctx.stroke();
+      // mặt bia
+      for (let i = 0; i < 10; i++) {
+        ctx.fillStyle = RING_COLORS[i];
+        ctx.beginPath();
+        ctx.arc(cx, cy, s * (1 - i / 10), 0, Math.PI * 2);
+        ctx.fill();
+        if (i) {
+          ctx.lineWidth = Math.max(0.6, s * 0.012);
+          ctx.strokeStyle = i === 2 || i === 3 ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)';
+          ctx.stroke();
+        }
+      }
+      ctx.lineWidth = lw;
+      ctx.strokeStyle = INK;
+      ctx.beginPath();
+      ctx.arc(cx, cy, s, 0, Math.PI * 2);
+      ctx.stroke();
+      for (const p of hits) drawStuck(cx + p.u * s, cy + p.v * s, s);
+    }
+
+    function drawStuck(x, y, s) {
+      // đuôi mũi tên chĩa về phía người bắn (dưới phải, nơi cầm cung)
+      const L = s * 0.32;
+      const ex = x + L * 0.55, ey = y + L * 0.85;
+      ctx.strokeStyle = '#6b3d22';
+      ctx.lineWidth = Math.max(1.5, s * 0.045);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.fillStyle = '#e8202e';
+      const f = s * 0.09;
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex + f, ey - f * 0.2);
+      ctx.lineTo(ex + f * 0.6, ey + f);
+      ctx.closePath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - f * 0.5, ey + f * 0.9);
+      ctx.lineTo(ex + f * 0.3, ey + f * 1.1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = INK;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(1.5, s * 0.03), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineCap = 'butt';
+    }
+
+    /** Vị trí mũi tên trên đường bay (toạ độ thế giới), p = 0..1. */
+    function flightPos(p) {
+      const f = flight;
+      return [f.x0 + (f.u - f.x0) * p, f.y0 + (f.v - f.y0) * p - Math.sin(p * Math.PI) * 0.5, f.z0 + (1 - f.z0) * p];
+    }
+
+    function drawFlying() {
+      const p = Math.min(1, (now - stateAt) / FLIGHT);
+      const tail = proj(...flightPos(p));
+      const tip = proj(...flightPos(Math.min(1, p + 0.08)));
+      const sc = tail[2];
+      ctx.strokeStyle = '#6b3d22';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = Math.max(1.5, sc * 0.05);
+      ctx.beginPath();
+      ctx.moveTo(tail[0], tail[1]);
+      ctx.lineTo(tip[0], tip[1]);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+      // lông đuôi nhìn từ phía sau: 3 cánh toả ra
+      ctx.fillStyle = '#e8202e';
+      const f = sc * 0.14;
+      for (const a of [-Math.PI / 2, Math.PI / 6, (Math.PI * 5) / 6]) {
+        ctx.beginPath();
+        ctx.moveTo(tail[0], tail[1]);
+        ctx.lineTo(tail[0] + Math.cos(a - 0.25) * f, tail[1] + Math.sin(a - 0.25) * f);
+        ctx.lineTo(tail[0] + Math.cos(a + 0.25) * f, tail[1] + Math.sin(a + 0.25) * f);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    function drawPetals(dt) {
+      if (!petals.length) return;
+      ctx.fillStyle = '#ffb3cf';
+      const sp = m * 0.0015;
+      for (const p of petals) {
+        p.ph += dt * 2;
+        p.x += (wind * 0.06 + 0.01 + Math.sin(p.ph) * 0.01) * dt * sp * 6;
+        p.y += (0.025 + Math.cos(p.ph * 0.7) * 0.01) * dt;
+        p.x = ((p.x % 1.2) + 1.2) % 1.2;
+        if (p.y > 1) p.y -= 1;
+        const x = p.x * w - w * 0.1, y = p.y * h;
+        ctx.beginPath();
+        ctx.ellipse(x, y, m * 0.009 * p.r, m * 0.005 * p.r, p.ph, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawCrosshair(x, y, r) {
+      for (const [c, lw] of [['rgba(29,29,31,0.55)', 4.5], ['#ffffff', 2]]) {
+        ctx.strokeStyle = c;
+        ctx.lineWidth = lw;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.moveTo(x - r * 1.6, y);
+        ctx.lineTo(x - r * 0.45, y);
+        ctx.moveTo(x + r * 0.45, y);
+        ctx.lineTo(x + r * 1.6, y);
+        ctx.moveTo(x, y - r * 1.6);
+        ctx.lineTo(x, y - r * 0.45);
+        ctx.moveTo(x, y + r * 0.45);
+        ctx.lineTo(x, y + r * 1.6);
+        ctx.stroke();
+      }
+    }
+
+    /** Cung đặt bên phải; khi kéo dây thì trượt nhẹ vào giữa, khi bắn thì giật lại. */
+    function bowPos() {
+      const s = sway(now);
+      // khi kéo dây cung lùi ra mép phải để không che bia đã phóng to
+      const gx = w - m * 0.11 + pose * m * 0.07 + recoil * m * 0.04 + s.u * m * 0.05 * pose;
+      const gy = h * 0.52 + pose * h * 0.02 - recoil * m * 0.03 + s.v * m * 0.05 * pose;
+      return [gx, gy];
+    }
+    function arrowRest() {
+      const [gx, gy] = bowPos();
+      return [gx - m * 0.06, gy];
+    }
+
+    function drawBow() {
+      const [gx, gy] = bowPos();
+      const th = Math.max(14, m * 0.055); // độ dày cánh cung
+      const g = h * 0.07; // nửa chiều dài tay cầm
+      const reach = Math.max(h * 0.62, 260);
+      const limb = (dir) => {
+        ctx.beginPath();
+        ctx.moveTo(gx, gy + dir * g);
+        ctx.bezierCurveTo(gx + th * 0.2, gy + dir * (g + reach * 0.35), gx + th * 1.5, gy + dir * reach * 0.75, gx + th * 2.6, gy + dir * reach);
+      };
+      // dây cung (phía sau cánh)
+      const tipX = gx + th * 2.6;
+      const nock = [tipX + th * 0.4 - pose * th * 1.8, gy];
+      ctx.strokeStyle = '#3b3b3b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(tipX, gy - reach);
+      ctx.lineTo(nock[0], nock[1]);
+      ctx.lineTo(tipX, gy + reach);
+      ctx.stroke();
+      // cánh cung: viền đen rồi đỏ san hô
+      ctx.lineCap = 'round';
+      for (const dir of [-1, 1]) {
+        limb(dir);
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = th + 6;
+        ctx.stroke();
+        ctx.strokeStyle = '#ff6159';
+        ctx.lineWidth = th;
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = th * 0.22;
+        ctx.save();
+        ctx.translate(-th * 0.22, 0);
+        limb(dir);
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.lineCap = 'butt';
+      // tay cầm nâu + 2 khớp nối đỏ
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = INK;
+      rr(gx - th * 0.45, gy - g, th * 0.9, g * 2, th * 0.2);
+      ctx.fillStyle = '#a65a42';
+      ctx.fill();
+      ctx.stroke();
+      for (const dir of [-1, 1]) {
+        rr(gx - th * 0.8, gy + dir * g - th * 0.4, th * 1.6, th * 0.8, th * 0.35);
+        ctx.fillStyle = '#ff6159';
+        ctx.fill();
+        ctx.stroke();
+      }
+      // mũi tên nằm trên tay đỡ khi đang sẵn sàng
+      if (state === 'ready') {
+        const [ax, ay] = arrowRest();
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = th * 0.34 + 4;
+        ctx.beginPath();
+        ctx.moveTo(gx + th * 0.6, gy);
+        ctx.lineTo(ax, ay);
+        ctx.stroke();
+        ctx.strokeStyle = '#8a4a2c';
+        ctx.lineWidth = th * 0.34;
+        ctx.stroke();
+        ctx.fillStyle = '#8f98a3';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(ax - th * 0.5, ay);
+        ctx.lineTo(ax + th * 0.15, ay - th * 0.45);
+        ctx.lineTo(ax + th * 0.15, ay + th * 0.45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
+    function drawSparks(dt) {
+      for (const p of sparks) {
+        if (p.life <= 0) continue;
+        p.life -= dt * 1.4;
+        p.vy += m * 1.2 * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillStyle = p.c;
+        ctx.fillRect(p.x - 3, p.y - 3, 6, 6);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawFloats(dt) {
+      const fs = Math.max(26, Math.min(48, m * 0.09));
+      ctx.textAlign = 'center';
+      for (const f of floats) {
+        if (f.life <= 0) continue;
+        f.life -= dt * 0.9;
+        f.y -= dt * 40;
+        const pop = 1 + Math.max(0, f.life - 0.8) * 2.5;
+        ctx.globalAlpha = Math.min(1, Math.max(0, f.life) * 2);
+        ctx.font = `900 ${Math.round(fs * pop)}px "Be Vietnam Pro", sans-serif`;
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = INK;
+        ctx.strokeText(f.text, f.x, f.y);
+        ctx.fillStyle = f.bad ? '#ff6b6b' : '#ffe14d';
+        ctx.fillText(f.text, f.x, f.y);
+        if (f.sub) {
+          ctx.font = `800 ${Math.round(fs * 0.55)}px "Be Vietnam Pro", sans-serif`;
+          ctx.strokeText(f.sub, f.x, f.y + fs * 0.7);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(f.sub, f.x, f.y + fs * 0.7);
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    /** Huy hiệu gió giữa phía trên: biểu tượng hướng + cấp gió có 1 chữ số thập phân. */
+    function drawWind() {
+      const fs = Math.max(13, Math.min(20, m * 0.042));
+      const val = Math.abs(wind).toFixed(1);
+      const num = getLang() === 'vi' ? val.replace('.', ',') : val;
+      ctx.font = `800 ${fs}px "Be Vietnam Pro", sans-serif`;
+      const label = t('archery.wind');
+      const tw = Math.max(ctx.measureText(label).width, ctx.measureText(num).width * 1.3);
+      const ph = fs * 2.7, ir = ph * 0.4;
+      const pw = ph * 0.5 + ir * 2 + fs * 0.6 + tw + ph * 0.35;
+      const x = (w - pw) / 2, y = 10;
+      rr(x, y, pw, ph, ph / 2);
+      ctx.fillStyle = 'rgba(70,84,92,0.62)';
+      ctx.fill();
+      const cx = x + ph * 0.5, cy = y + ph / 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, ir, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(40,48,54,0.55)';
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#ffcf3a';
+      ctx.stroke();
+      // 2 chevron chỉ hướng gió (lật khi gió sang trái), không gió thì vẽ dấu gạch
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = Math.max(2.5, ir * 0.2);
+      ctx.beginPath();
+      if (Math.abs(wind) < 0.05) {
+        ctx.moveTo(cx - ir * 0.4, cy);
+        ctx.lineTo(cx + ir * 0.4, cy);
+      } else {
+        const d = Math.sign(wind);
+        for (const off of [-0.22, 0.22]) {
+          const ox = cx + off * ir * 1.4 * d;
+          ctx.moveTo(ox - d * ir * 0.2, cy - ir * 0.35);
+          ctx.lineTo(ox + d * ir * 0.15, cy);
+          ctx.lineTo(ox - d * ir * 0.2, cy + ir * 0.35);
+        }
+      }
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+      ctx.lineJoin = 'miter';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'left';
+      const tx = cx + ir + fs * 0.6;
+      ctx.font = `800 ${Math.round(fs * 0.85)}px "Be Vietnam Pro", sans-serif`;
+      ctx.fillText(label, tx, cy - fs * 0.15);
+      ctx.font = `900 ${Math.round(fs * 1.15)}px "Be Vietnam Pro", sans-serif`;
+      ctx.fillText(num, tx, cy + fs * 1.05);
+    }
+
+    /** 5 ô điểm từng mũi ở góc dưới bên trái. */
+    function drawShots() {
+      const r = Math.max(13, Math.min(19, m * 0.04));
+      const y = h - r - 14;
+      ctx.textAlign = 'center';
+      ctx.font = `800 ${Math.round(r * 0.95)}px "Be Vietnam Pro", sans-serif`;
+      for (let i = 0; i < ARROWS; i++) {
+        const x = 14 + r + i * (r * 2 + 6);
+        const p = shotPoints[i];
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = p === undefined ? 'rgba(29,29,31,0.35)' : p ? 'rgba(29,29,31,0.75)' : 'rgba(150,20,30,0.8)';
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = i === shot && state !== 'done' ? '#ffcf3a' : 'rgba(255,255,255,0.7)';
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(p === undefined ? '' : String(p), x, y + r * 0.34);
+      }
+    }
+
+    function drawHint() {
+      const fs = Math.max(14, Math.min(20, m * 0.045));
+      ctx.font = `800 ${fs}px "Be Vietnam Pro", sans-serif`;
+      const text = `☝ ${t('archery.hint')}`;
+      const tw = ctx.measureText(text).width;
+      const x = w / 2, y = h * 0.74;
+      ctx.globalAlpha = 0.75 + Math.sin(now * 4) * 0.25;
+      rr(x - tw / 2 - fs, y - fs * 1.3, tw + fs * 2, fs * 2.3, fs * 1.15);
+      ctx.fillStyle = 'rgba(29,29,31,0.6)';
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, x, y + fs * 0.05);
+      ctx.globalAlpha = 1;
     }
 
     hud.score(0);
