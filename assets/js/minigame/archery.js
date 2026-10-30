@@ -152,11 +152,17 @@ export function play(stage, hud, signal) {
       aim.v = Math.max(-2, Math.min(2, aim.v));
     };
 
+    // âm thanh: gió nền suốt ván; tiếng kéo dây kéo dài tới khi thả / huỷ
+    const ambience = sfx.windAmbience(wind.s);
+    let stopDraw = () => {};
+    const endDraw = () => { stopDraw(); stopDraw = () => {}; };
+
     const startAim = (pointer) => {
       aim.on = true;
       aim.pointer = pointer;
       touched = true;
-      sfx.drawBow();
+      endDraw();
+      stopDraw = sfx.bowDraw();
     };
     const onDown = (e) => {
       if (state !== 'ready' || aim.on) return;
@@ -179,6 +185,7 @@ export function play(stage, hud, signal) {
     const onUp = (e) => {
       if (!aim.on || e.pointerId !== aim.pointer) return;
       aim.on = false;
+      endDraw();
       if (e.type === 'pointerup') fire();
     };
     // bàn phím: mũi tên di chuyển tâm ngắm, Space / Enter bắn
@@ -190,7 +197,7 @@ export function play(stage, hud, signal) {
         keys[k] = down;
         if (down && !aim.on && state === 'ready') startAim('key');
       } else if ((e.key === ' ' || e.key === 'Enter') && down) {
-        if (aim.on && aim.pointer === 'key') { aim.on = false; fire(); }
+        if (aim.on && aim.pointer === 'key') { aim.on = false; endDraw(); fire(); }
       } else return;
       e.preventDefault();
     };
@@ -210,6 +217,8 @@ export function play(stage, hud, signal) {
 
     const cleanup = () => {
       cancelAnimationFrame(raf);
+      endDraw();
+      ambience.stop();
       ro?.disconnect();
       removeEventListener('resize', resize);
       removeEventListener('keydown', onKey);
@@ -234,11 +243,13 @@ export function play(stage, hud, signal) {
       timedOut = false;
       setState('flying');
       sfx.release();
+      sfx.whoosh(FLIGHT, u * 0.4); // tiếng vút lệch về phía mũi tên bay tới
     }
 
     /** Hết giờ mà chưa bắn: mũi đó 0 điểm. */
     function timeout() {
       aim.on = false;
+      endDraw();
       timedOut = true;
       land({ u: null, v: null, points: 0 });
     }
@@ -249,7 +260,8 @@ export function play(stage, hud, signal) {
       shotPoints.push(f.points);
       hud.score(score);
       // mũi trúng giá gỗ / mặt bia thì cắm lại; bay quá giá thì mất
-      if (f.u !== null && Math.abs(f.u) <= 1.25 && f.v >= -1.3 && f.v <= 1.3) {
+      const stuck = f.u !== null && Math.abs(f.u) <= 1.25 && f.v >= -1.3 && f.v <= 1.3;
+      if (stuck) {
         hits.push({ u: f.u, v: f.v });
         jolt = 1;
         stuckAt = now;
@@ -264,8 +276,13 @@ export function play(stage, hud, signal) {
         bad: !f.points,
         life: 1,
       });
+      // âm thanh: cắm vào bia / giá gỗ (đuôi rung "boing"), hồng tâm có chuông + vỗ tay, trượt hẳn thì "ồ…"
+      if (f.points) sfx.hit(f.points);
+      else if (stuck) sfx.boardHit();
+      else sfx.miss();
+      if (stuck) sfx.wobble();
+      if (bull) sfx.bullseye();
       if (f.points) {
-        sfx.hit(f.points);
         if (bull) {
           if (!reduceMotion) shake = 0.4;
           for (let i = 0; i < 26; i++) {
@@ -273,7 +290,7 @@ export function play(stage, hud, signal) {
             sparks.push({ x: fx, y: fy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - m * 0.2, life: 1, c: i % 3 ? '#ffcf3a' : '#ff6b6b' });
           }
         }
-      } else sfx.miss();
+      }
       setState(shot >= ARROWS ? 'done' : 'pause');
     }
 
@@ -315,6 +332,8 @@ export function play(stage, hud, signal) {
       } else if (state === 'pause' && now - stateAt >= PAUSE) {
         wind = nextWind(wind);
         windShown.pulse = 1;
+        ambience.set(wind.s); // cơn gió giật báo gió đổi
+        sfx.nock();
         Object.assign(aim, newAim());
         clockStart = now;
         lastSec = SHOT_SECONDS;
