@@ -7,7 +7,7 @@ rules_version = '2';
 //   employees/{msnv}  { name, claimedBy }                 admin nạp từ CSV
 //   users/{uid}       { msnv, email, createdAt }          1 Gmail ↔ 1 MSNV
 //   scores/{uid}      { msnv, name, lixi, quiz, memory, total, updatedAt, session, quizDay?, quizPlays?, banned? }
-//   admins/{email}    { addedBy?, addedAt? }              admin đầu tiên tạo tay trong Console, sau đó thêm ở admin.html
+//   admins/{email}    { addedBy?, addedAt? }              admin tạo tay trong Console (không có addedBy) = admin gốc; admin thêm ở admin.html có addedBy
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
@@ -17,6 +17,10 @@ service cloud.firestore {
     function isAdmin() {
       return signedIn() && request.auth.token.email_verified == true
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+    // admin gốc: tạo tay trong Console nên document không có field addedBy
+    function isRootAdmin() {
+      return isAdmin() && !get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data.has('addedBy');
     }
 
     // Khung giờ mở game (giờ VN = UTC+7) — giữ khớp với GAMES.openAt / closeAt trong config.js
@@ -45,8 +49,8 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['addedBy', 'addedAt'])
         && request.resource.data.addedBy == request.auth.token.email
         && request.resource.data.addedAt == request.time;
-      // không tự xoá mình → luôn còn ít nhất một admin
-      allow delete: if isAdmin() && email != request.auth.token.email;
+      // chỉ admin gốc mới xoá được admin khác; không tự xoá mình → luôn còn ít nhất một admin
+      allow delete: if isRootAdmin() && email != request.auth.token.email;
     }
 
     match /employees/{msnv} {

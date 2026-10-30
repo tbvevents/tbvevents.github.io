@@ -8,6 +8,7 @@ Ghi lại các thay đổi đáng chú ý của trang YEP 2026. Mục mới nh�
 - **Trang quản trị: cấp / thu hồi quyền admin** (mục *Quản trị viên*), không cần vào Firebase Console.
   - Thêm admin bằng Gmail, xem danh sách admin (ai thêm, lúc nào), xoá quyền.
   - Không tự xoá quyền của chính mình được, nên luôn còn ít nhất một admin.
+  - Chỉ admin gốc (tạo tay trong Console, không có `addedBy`) mới xoá được admin khác. Admin thêm qua trang quản trị có đầy đủ quyền khác nhưng không xoá được admin.
   - `firestore.rules`: admin được `list` / `create` / `delete` trong `admins`. **Cần Publish lại rules trên Firebase Console.**
 - **Trang quản trị: sửa / xoá nhân viên**, không cần vào Firebase Console.
   - Tra cứu MSNV: sửa họ tên tại chỗ, nút *Xoá nhân viên* (dùng cho cả người chưa liên kết Gmail).

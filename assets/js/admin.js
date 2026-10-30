@@ -32,12 +32,17 @@ async function start() {
   $('#btn-logout').addEventListener('click', () => api.logOut());
 
   let myEmail = '';
+  let myRoot = false;
   api.onUser(async (user) => {
     myEmail = user?.email ?? '';
+    myRoot = false;
     if (!user) { $('#who').hidden = true; show('a-login'); return; }
     $('#who-email').textContent = user.email;
     $('#who').hidden = false;
-    const ok = await getDoc(doc(db, 'admins', user.email)).then((s) => s.exists()).catch(() => false);
+    const snap = await getDoc(doc(db, 'admins', user.email)).catch(() => null);
+    const ok = !!snap?.exists();
+    // admin gốc: tạo tay trong Console nên không có addedBy
+    myRoot = ok && !snap.data().addedBy;
     show(ok ? 'a-panel' : 'a-denied');
   });
 
@@ -206,7 +211,7 @@ async function start() {
       <tr>
         <td>${esc(a.email)}${a.email === myEmail ? ' <i>(bạn)</i>' : ''}</td>
         <td>${esc(a.addedBy ?? '(Console)')}</td><td>${fmt(a.addedAt)}</td>
-        <td>${a.email === myEmail ? '' : `<button class="btn btn-ghost btn-small" type="button" data-email="${esc(a.email)}">Xoá quyền</button>`}</td>
+        <td>${a.email === myEmail || !myRoot ? '' : `<button class="btn btn-ghost btn-small" type="button" data-email="${esc(a.email)}">Xoá quyền</button>`}</td>
       </tr>`).join('');
     $('#admin-table').hidden = false;
   }
@@ -232,7 +237,7 @@ async function start() {
     const btn = e.target.closest('[data-email]');
     if (!btn) return;
     const email = btn.dataset.email;
-    if (email === myEmail || !confirm(`Xoá quyền admin của ${email}?`)) return;
+    if (!myRoot || email === myEmail || !confirm(`Xoá quyền admin của ${email}?`)) return;
     try {
       await deleteDoc(doc(db, 'admins', email));
       toast(`Đã xoá quyền admin của ${email}.`);
