@@ -75,7 +75,7 @@ nằm trong [`firestore.rules`](firestore.rules).
 4. Tab **Indexes → Composite → Create index**: collection `scores`, field `total` *Descending*, field `updatedAt` *Ascending*, query scope *Collection*.
    (Hoặc mở landing page, bấm link tạo index trong lỗi ở DevTools Console.)
 5. **Project settings → Your apps → Web (`</>`)** → đăng ký app → copy `apiKey`, `authDomain`, `projectId`, `appId` vào `FIREBASE` trong [`assets/js/config.js`](assets/js/config.js).
-6. Firestore → **Start collection** `admins` → Document ID = email Google của bạn (không cần field nào). Thêm email các thành viên BTC khác nếu cần.
+6. Firestore → **Start collection** `admins` → Document ID = email Google của bạn (không cần field nào). Chỉ cần tạo tay admin đầu tiên; các thành viên BTC khác thêm ngay trong `admin.html` (mục *Quản trị viên*).
 7. Mở `/admin.html`, đăng nhập, nạp file CSV danh sách nhân viên (`MSNV,Họ tên`).
 
 ### Quản lý nhân viên
@@ -83,6 +83,13 @@ nằm trong [`firestore.rules`](firestore.rules).
 - **Thêm người mới:** nạp CSV chỉ gồm nhân viên mới, không cần gộp danh sách cũ. Nếu MSNV đã có thì chỉ cập nhật họ tên, liên kết Gmail và điểm vẫn giữ nguyên.
 - **Sửa họ tên / xoá:** trong `admin.html`, tra cứu theo MSNV (mục 2), hoặc bấm *Tải danh sách nhân viên* rồi lọc và bấm *Sửa* / *Xoá* trên từng dòng. Sửa tên sẽ cập nhật luôn tên trên bảng điểm.
 - Nếu xoá một nhân viên đã liên kết Gmail, liên kết và **điểm của người đó cũng bị xoá**. Muốn giữ nhân viên nhưng cho nhận lại bằng Gmail khác thì dùng *Gỡ liên kết*.
+
+### Quản trị viên
+
+- Trong `admin.html` → mục *Quản trị viên*: nhập Gmail rồi bấm *Thêm admin*. Người đó đăng nhập `admin.html` bằng đúng Gmail này là dùng được.
+- *Tải danh sách admin* để xem ai đang có quyền, ai thêm và thêm lúc nào. *Xoá quyền* để thu hồi.
+- Không thể tự xoá quyền của chính mình, nên luôn còn ít nhất một admin. Firestore rules cũng chặn việc này.
+- Chức năng này cần bản `firestore.rules` mới. Sau khi cập nhật file, nhớ dán lại vào Firebase Console → Firestore → Rules → **Publish**.
 
 ### Đổi thời gian / trần điểm / số lượt
 

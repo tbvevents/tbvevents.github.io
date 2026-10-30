@@ -1,7 +1,7 @@
 // Trang quản trị: nạp / sửa / xoá nhân viên, gỡ liên kết Gmail ↔ MSNV, loại kết quả, xuất bảng điểm.
 // Quyền admin do firestore.rules kiểm tra (collection admins), trang này chỉ là giao diện.
 import {
-  doc, getDoc, getDocs, writeBatch, updateDoc, collection, query, orderBy,
+  doc, getDoc, getDocs, setDoc, deleteDoc, writeBatch, updateDoc, collection, query, orderBy, serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js';
 import { isConfigured, db } from './firebase.js';
 import { BANK, TOPICS } from './minigame/quiz-bank.js';
@@ -31,7 +31,9 @@ async function start() {
   $('#btn-login').addEventListener('click', () => api.signIn().catch((e) => toast(e.message)));
   $('#btn-logout').addEventListener('click', () => api.logOut());
 
+  let myEmail = '';
   api.onUser(async (user) => {
+    myEmail = user?.email ?? '';
     if (!user) { $('#who').hidden = true; show('a-login'); return; }
     $('#who-email').textContent = user.email;
     $('#who').hidden = false;
@@ -191,6 +193,52 @@ async function start() {
       if (changed) await loadEmps();
     } catch (err) {
       toast(err.message);
+    }
+  });
+
+  /* ── quản trị viên ── */
+  const adminBody = $('#admin-table tbody');
+
+  async function loadAdmins() {
+    const snap = await getDocs(collection(db, 'admins'));
+    const list = snap.docs.map((d) => ({ email: d.id, ...d.data() })).sort((a, b) => a.email.localeCompare(b.email));
+    adminBody.innerHTML = list.map((a) => `
+      <tr>
+        <td>${esc(a.email)}${a.email === myEmail ? ' <i>(bạn)</i>' : ''}</td>
+        <td>${esc(a.addedBy ?? '(Console)')}</td><td>${fmt(a.addedAt)}</td>
+        <td>${a.email === myEmail ? '' : `<button class="btn btn-ghost btn-small" type="button" data-email="${esc(a.email)}">Xoá quyền</button>`}</td>
+      </tr>`).join('');
+    $('#admin-table').hidden = false;
+  }
+
+  $('#btn-admin-load').addEventListener('click', () => loadAdmins().catch((e) => toast(e.message)));
+
+  $('#admin-add').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $('#admin-email').value.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Email không hợp lệ.'); return; }
+    try {
+      if ((await getDoc(doc(db, 'admins', email))).exists()) { toast(`${email} đã là admin.`); return; }
+      await setDoc(doc(db, 'admins', email), { addedBy: myEmail, addedAt: serverTimestamp() });
+      $('#admin-email').value = '';
+      toast(`Đã cấp quyền admin cho ${email}.`);
+      await loadAdmins();
+    } catch (err) {
+      toast('Thêm thất bại: ' + err.message);
+    }
+  });
+
+  adminBody.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-email]');
+    if (!btn) return;
+    const email = btn.dataset.email;
+    if (email === myEmail || !confirm(`Xoá quyền admin của ${email}?`)) return;
+    try {
+      await deleteDoc(doc(db, 'admins', email));
+      toast(`Đã xoá quyền admin của ${email}.`);
+      await loadAdmins();
+    } catch (err) {
+      toast('Xoá thất bại: ' + err.message);
     }
   });
 
