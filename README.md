@@ -88,7 +88,7 @@ nằm trong [`firestore.rules`](firestore.rules).
 
 - Trong `admin.html` → mục *Quản trị viên*: nhập Gmail rồi bấm *Thêm admin*. Người đó đăng nhập `admin.html` bằng đúng Gmail này là dùng được.
 - *Tải danh sách admin* để xem ai đang có quyền, ai thêm và thêm lúc nào.
-- Admin gốc (document tạo tay trong Console, không có field `addedBy`) có thể *Xoá quyền* của admin khác. Admin được thêm qua `admin.html` không xoá được admin nào.
+- Chỉ admin gốc (document tạo tay trong Console, không có field `addedBy`) mới *Thêm admin* và *Xoá quyền* admin khác. Admin được thêm qua `admin.html` có mọi quyền khác nhưng không thêm / xoá được admin nào.
 - Không thể tự xoá quyền của chính mình, nên luôn còn ít nhất một admin. Firestore rules cũng chặn việc này.
 - Chức năng này cần bản `firestore.rules` mới. Sau khi cập nhật file, nhớ dán lại vào Firebase Console → Firestore → Rules → **Publish**.
 

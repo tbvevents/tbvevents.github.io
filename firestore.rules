@@ -20,7 +20,7 @@ service cloud.firestore {
     }
     // admin gốc: tạo tay trong Console nên document không có field addedBy
     function isRootAdmin() {
-      return isAdmin() && !get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data.has('addedBy');
+      return isAdmin() && !('addedBy' in get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data);
     }
 
     // Khung giờ mở game (giờ VN = UTC+7) — giữ khớp với GAMES.openAt / closeAt trong config.js
@@ -44,8 +44,8 @@ service cloud.firestore {
     match /admins/{email} {
       allow get: if (signedIn() && request.auth.token.email == email) || isAdmin();
       allow list: if isAdmin();
-      // thêm admin từ admin.html: ghi lại ai thêm và lúc nào
-      allow create: if isAdmin()
+      // chỉ admin gốc mới thêm admin từ admin.html: ghi lại ai thêm và lúc nào
+      allow create: if isRootAdmin()
         && request.resource.data.keys().hasOnly(['addedBy', 'addedAt'])
         && request.resource.data.addedBy == request.auth.token.email
         && request.resource.data.addedAt == request.time;

@@ -43,6 +43,7 @@ async function start() {
     const ok = !!snap?.exists();
     // admin gốc: tạo tay trong Console nên không có addedBy
     myRoot = ok && !snap.data().addedBy;
+    $('#admin-add').hidden = !myRoot;
     show(ok ? 'a-panel' : 'a-denied');
   });
 
@@ -220,6 +221,7 @@ async function start() {
 
   $('#admin-add').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!myRoot) return;
     const email = $('#admin-email').value.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Email không hợp lệ.'); return; }
     try {
