@@ -47,7 +47,7 @@ Trong HTML dùng `data-i18n="khoá"` (văn bản), `data-i18n-html` (có thẻ `
 | `assets/js/world/fireworks.js` | Hệ hạt pháo hoa |
 | `assets/js/firebase.js`, `leaderboard.js` | Kết nối Firestore, Top 10 realtime trên landing page |
 | `minigame.html`, `assets/js/minigame/` | Trang mini game: đăng nhập, nhận MSNV, 3 game |
-| `admin.html`, `assets/js/admin.js` | Nạp danh sách nhân viên, gỡ liên kết, loại kết quả, xuất CSV |
+| `admin.html`, `assets/js/admin.js` | Nạp / sửa / xoá nhân viên, gỡ liên kết, loại kết quả, xuất CSV |
 | `firestore.rules` | Luật bảo mật & chống gian lận (dán vào Firebase Console) |
 
 Thêm điểm dừng mới: thêm một `<section data-step>` trong HTML và một phần tử tương ứng trong mảng `STOPS` ở `main.js`.
@@ -77,6 +77,12 @@ nằm trong [`firestore.rules`](firestore.rules).
 5. **Project settings → Your apps → Web (`</>`)** → đăng ký app → copy `apiKey`, `authDomain`, `projectId`, `appId` vào `FIREBASE` trong [`assets/js/config.js`](assets/js/config.js).
 6. Firestore → **Start collection** `admins` → Document ID = email Google của bạn (không cần field nào). Thêm email các thành viên BTC khác nếu cần.
 7. Mở `/admin.html`, đăng nhập, nạp file CSV danh sách nhân viên (`MSNV,Họ tên`).
+
+### Quản lý nhân viên
+
+- **Thêm người mới:** nạp CSV chỉ gồm nhân viên mới, không cần gộp danh sách cũ. Nếu MSNV đã có thì chỉ cập nhật họ tên, liên kết Gmail và điểm vẫn giữ nguyên.
+- **Sửa họ tên / xoá:** trong `admin.html`, tra cứu theo MSNV (mục 2), hoặc bấm *Tải danh sách nhân viên* rồi lọc và bấm *Sửa* / *Xoá* trên từng dòng. Sửa tên sẽ cập nhật luôn tên trên bảng điểm.
+- Nếu xoá một nhân viên đã liên kết Gmail, liên kết và **điểm của người đó cũng bị xoá**. Muốn giữ nhân viên nhưng cho nhận lại bằng Gmail khác thì dùng *Gỡ liên kết*.
 
 ### Đổi thời gian / trần điểm / số lượt
 

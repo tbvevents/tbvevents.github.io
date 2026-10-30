@@ -1,4 +1,4 @@
-// Trang quản trị: nạp danh sách nhân viên, gỡ liên kết Gmail ↔ MSNV, loại kết quả, xuất bảng điểm.
+// Trang quản trị: nạp / sửa / xoá nhân viên, gỡ liên kết Gmail ↔ MSNV, loại kết quả, xuất bảng điểm.
 // Quyền admin do firestore.rules kiểm tra (collection admins), trang này chỉ là giao diện.
 import {
   doc, getDoc, getDocs, writeBatch, updateDoc, collection, query, orderBy,
@@ -72,7 +72,36 @@ async function start() {
     }
   });
 
-  /* ── 2 · tra cứu & gỡ liên kết ── */
+  /* ── 2 · tra cứu, sửa, xoá & gỡ liên kết ── */
+  /** Đổi họ tên; nếu đã có điểm thì đổi luôn tên trên bảng điểm. Trả về false nếu tên trống. */
+  async function renameEmployee(msnv, claimedBy, newName) {
+    const name = String(newName ?? '').trim();
+    if (!name) { toast('Họ tên không được để trống.'); return false; }
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'employees', msnv), { name });
+    if (claimedBy && (await getDoc(doc(db, 'scores', claimedBy))).exists()) batch.update(doc(db, 'scores', claimedBy), { name });
+    await batch.commit();
+    toast(`Đã đổi tên ${msnv} thành ${name}.`);
+    return true;
+  }
+
+  /** Xoá nhân viên (hỏi xác nhận trước); nếu đã liên kết Gmail thì xoá luôn tài khoản và điểm. */
+  async function removeEmployee(msnv, name, claimedBy) {
+    const msg = claimedBy
+      ? `Xoá nhân viên ${name} (${msnv})? MSNV này đã liên kết Gmail — liên kết và điểm cũng sẽ bị xoá.`
+      : `Xoá nhân viên ${name} (${msnv})?`;
+    if (!confirm(msg)) return false;
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'employees', msnv));
+    if (claimedBy) {
+      batch.delete(doc(db, 'users', claimedBy));
+      batch.delete(doc(db, 'scores', claimedBy));
+    }
+    await batch.commit();
+    toast(`Đã xoá ${msnv}.`);
+    return true;
+  }
+
   $('#lookup').addEventListener('submit', async (e) => {
     e.preventDefault();
     const msnv = api.normalizeMsnv($('#lookup-msnv').value);
@@ -80,12 +109,28 @@ async function start() {
     const emp = await getDoc(doc(db, 'employees', msnv));
     if (!emp.exists()) { out.innerHTML = `<p>Không có MSNV <b>${esc(msnv)}</b> trong danh sách.</p>`; return; }
     const { name, claimedBy = null } = emp.data();
-    if (!claimedBy) { out.innerHTML = `<p><b>${esc(name)}</b> — chưa liên kết Gmail.</p>`; return; }
-    const [u, s] = await Promise.all([getDoc(doc(db, 'users', claimedBy)), getDoc(doc(db, 'scores', claimedBy))]);
+    const [u, s] = claimedBy
+      ? await Promise.all([getDoc(doc(db, 'users', claimedBy)), getDoc(doc(db, 'scores', claimedBy))])
+      : [null, null];
     out.innerHTML = `
-      <p><b>${esc(name)}</b> — liên kết với <b>${esc(u.data()?.email ?? '(không rõ)')}</b>, tổng điểm ${s.data()?.total ?? 0}.</p>
-      <div class="actions"><button class="btn btn-ghost btn-small" id="btn-unlink" type="button">Gỡ liên kết (xoá điểm)</button></div>`;
-    $('#btn-unlink').addEventListener('click', async () => {
+      <p><b>${esc(name)}</b> — ${claimedBy
+        ? `liên kết với <b>${esc(u.data()?.email ?? '(không rõ)')}</b>, tổng điểm ${s.data()?.total ?? 0}.`
+        : 'chưa liên kết Gmail.'}</p>
+      <div class="claim-form"><div class="row">
+        <input id="edit-name" value="${esc(name)}" autocomplete="off" aria-label="Họ tên" />
+        <button class="btn btn-small" id="btn-rename" type="button">Lưu tên</button>
+      </div></div>
+      <div class="actions">
+        ${claimedBy ? '<button class="btn btn-ghost btn-small" id="btn-unlink" type="button">Gỡ liên kết (xoá điểm)</button>' : ''}
+        <button class="btn btn-ghost btn-small" id="btn-remove" type="button">Xoá nhân viên</button>
+      </div>`;
+    $('#btn-rename').addEventListener('click', () => renameEmployee(msnv, claimedBy, $('#edit-name').value).catch((err) => toast(err.message)));
+    $('#btn-remove').addEventListener('click', async () => {
+      try {
+        if (await removeEmployee(msnv, name, claimedBy)) out.innerHTML = `<p>Đã xoá <b>${esc(msnv)}</b> khỏi danh sách.</p>`;
+      } catch (err) { toast(err.message); }
+    });
+    $('#btn-unlink')?.addEventListener('click', async () => {
       if (!confirm(`Gỡ liên kết MSNV ${msnv} khỏi ${u.data()?.email}? Điểm của MSNV này sẽ bị xoá.`)) return;
       const batch = writeBatch(db);
       batch.delete(doc(db, 'users', claimedBy));
@@ -94,6 +139,59 @@ async function start() {
       await batch.commit();
       out.innerHTML = `<p>Đã gỡ liên kết <b>${esc(msnv)}</b>. Nhân viên có thể đăng nhập và nhận lại.</p>`;
     });
+  });
+
+  /* ── danh sách nhân viên ── */
+  let emps = [];
+  const empBody = $('#emp-table tbody');
+
+  async function loadEmps() {
+    const [es, us] = await Promise.all([getDocs(collection(db, 'employees')), getDocs(collection(db, 'users'))]);
+    const emails = new Map(us.docs.map((d) => [d.id, d.data().email]));
+    emps = es.docs
+      .map((d) => ({ msnv: d.id, name: d.data().name, claimedBy: d.data().claimedBy ?? null }))
+      .map((x) => ({ ...x, email: x.claimedBy ? emails.get(x.claimedBy) ?? '(không rõ)' : '' }))
+      .sort((a, b) => a.msnv.localeCompare(b.msnv, 'vi', { numeric: true }));
+    $('#emp-table').hidden = false;
+    $('#emp-filter-wrap').hidden = false;
+    renderEmps();
+  }
+
+  function renderEmps() {
+    const q = $('#emp-filter').value.trim().toLowerCase();
+    const list = q ? emps.filter((x) => x.msnv.toLowerCase().includes(q) || x.name.toLowerCase().includes(q)) : emps;
+    $('#emp-summary').textContent = `${emps.length} nhân viên, ${emps.filter((x) => x.claimedBy).length} đã liên kết Gmail`
+      + (q ? ` · đang hiện ${list.length}` : '') + '.';
+    empBody.innerHTML = list.map((x) => `
+      <tr>
+        <td>${esc(x.msnv)}</td><td>${esc(x.name)}</td><td>${esc(x.email)}</td>
+        <td>
+          <button class="btn btn-ghost btn-small" type="button" data-act="edit" data-msnv="${esc(x.msnv)}">Sửa</button>
+          <button class="btn btn-ghost btn-small" type="button" data-act="del" data-msnv="${esc(x.msnv)}">Xoá</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  $('#btn-emp-load').addEventListener('click', () => loadEmps().catch((e) => toast(e.message)));
+  $('#emp-filter').addEventListener('input', renderEmps);
+
+  empBody.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-msnv]');
+    if (!btn) return;
+    const x = emps.find((y) => y.msnv === btn.dataset.msnv);
+    try {
+      let changed = false;
+      if (btn.dataset.act === 'edit') {
+        const name = prompt(`Họ tên mới cho ${x.msnv}:`, x.name);
+        if (name === null || name.trim() === x.name) return;
+        changed = await renameEmployee(x.msnv, x.claimedBy, name);
+      } else {
+        changed = await removeEmployee(x.msnv, x.name, x.claimedBy);
+      }
+      if (changed) await loadEmps();
+    } catch (err) {
+      toast(err.message);
+    }
   });
 
   /* ── 3 · bảng điểm ── */

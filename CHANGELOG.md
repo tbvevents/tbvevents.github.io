@@ -1,0 +1,23 @@
+# Changelog
+
+Ghi lại các thay đổi đáng chú ý của trang YEP 2026. Mục mới nhất ở trên cùng.
+
+## 2026-10-30
+
+### Thêm
+- **Trang quản trị: sửa / xoá nhân viên**, không cần vào Firebase Console.
+  - Tra cứu MSNV: sửa họ tên tại chỗ, nút *Xoá nhân viên* (dùng cho cả người chưa liên kết Gmail).
+  - Mục mới *Danh sách nhân viên*: tải toàn bộ, lọc theo MSNV/họ tên, xem Gmail đã liên kết, nút *Sửa* / *Xoá* từng dòng.
+  - Sửa tên sẽ cập nhật luôn tên trên bảng điểm. Xoá người đã liên kết thì xoá luôn tài khoản liên kết và điểm (có hộp xác nhận).
+- Chuyển ngôn ngữ **Tiếng Việt / English** (nút VI | EN góc dưới bên phải) cho landing page và mini game, kèm bản tiếng Anh của kho câu hỏi Đố vui (`85291b6`).
+- Nhạc nền cho mini game `assets/audio/nhac-nen-games.mp3` (`6ab7db3`).
+
+### Tài liệu
+- README: thêm mục *Quản lý nhân viên* (nạp CSV chỉ cần người mới, sửa/xoá trong admin).
+
+## Trước đó
+
+- `8132b88` Sửa màn hình mini game: ẩn khung game cho đến khi bắt đầu chơi, hiện nút đăng nhập khi chưa đăng nhập.
+- `498be2e` Làm lại mini game: sảnh gọn hơn, popup luật chơi, âm thanh, kho 155 câu Đố vui với giới hạn lượt mỗi ngày.
+- `5d8330c` Cấu hình Firebase web app.
+- `685f0b3` Pháo hoa: chạm vào nửa trên màn hình (bầu trời), chạy ổn trên cả cảm ứng và chuột.
