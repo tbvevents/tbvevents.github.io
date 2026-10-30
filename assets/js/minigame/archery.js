@@ -1,19 +1,22 @@
-// Bắn cung: 5 mũi tên, chạm-kéo để nhắm, thả để bắn. Gió ngẫu nhiên mỗi mũi đẩy lệch ngang.
+// Bắn cung: 5 mũi tên, chạm-kéo để nhắm, thả để bắn. Gió đổi hướng (mọi phía) và tốc độ sau mỗi mũi.
 // Vòng trong cùng 10 điểm, giảm dần 1 điểm mỗi vòng; ra ngoài bia 0 điểm → tối đa 50,
 // khớp với trần điểm trong firestore.rules.
 //
 // Cảnh vẽ phối cảnh 3D đơn giản: mỗi vật có toạ độ thế giới (X, Y, z) tính theo bán kính bia R0,
-// bia ở z = 1, điểm tụ là tâm bia. Khi nhắm, camera tiến tới (cam: 0 → camMax) nên vật gần phóng nhanh,
-// vật xa gần như đứng yên (parallax). Mọi chuyển động tính theo dt nên mượt ở mọi tần số màn hình.
+// bia ở z = 1, điểm tụ là tâm bia. Lúc ngắm camera đứng yên (bia giữ nguyên cỡ), chỉ còn đầu mũi tên và tâm ngắm;
+// khi thả, camera đuổi theo mũi tên tới bia (cam: 0 → camHit) nên vật gần phóng nhanh, vật xa gần như đứng yên
+// (parallax). Mọi chuyển động tính theo dt nên mượt ở mọi tần số màn hình.
 import * as sfx from './sounds.js';
 import { t, getLang } from '../i18n.js';
 
 const ARROWS = 5;
 const SHOT_SECONDS = 10;
-const FLIGHT = 0.5; // giây mũi tên bay
+const FLIGHT = 0.95; // giây mũi tên bay
 const HOLD = 0.6; // giây giữ góc nhìn gần sau khi mũi tên cắm
 const PAUSE = 1.15; // giây từ lúc cắm tới mũi kế tiếp (gồm cả lúc camera lùi ra)
+const MIN_WIND = 0.5;
 const MAX_WIND = 5;
+const AIM_SENS = 4; // ngón tay đi 4 bán kính bia thì tâm ngắm đi 1 bán kính bia
 const GROUND = 1.65; // mặt đất nằm dưới tâm bia bao nhiêu bán kính bia
 // màu 10 vòng từ ngoài vào trong: trắng, đen, xanh, đỏ, vàng (mỗi màu 2 vòng)
 const RING_COLORS = ['#f4efe6', '#f4efe6', '#2b2f3a', '#2b2f3a', '#2f8fe0', '#2f8fe0', '#e8333a', '#e8333a', '#ffcf3a', '#ffcf3a'];
@@ -72,7 +75,7 @@ export function play(stage, hud, signal) {
     let w = 0, h = 0, dpr = 1, m = 0;
     let R0 = 0; // bán kính bia khi chưa nhắm (px)
     let F = { x: 0, y: 0 }; // tâm bia = điểm tụ
-    let ZMAX = 1, camMax = 0;
+    let camHit = 0; // vị trí camera khi mũi tên cắm vào bia
     let sky = null;
     const resize = () => {
       dpr = Math.min(devicePixelRatio || 1, 2);
@@ -83,11 +86,10 @@ export function play(stage, hud, signal) {
       canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       m = Math.min(w, h);
-      R0 = m * 0.075;
+      R0 = m * 0.08;
       F = { x: w / 2, y: h * 0.42 };
-      // giá bia (cao 2.6 bán kính) phóng to vẫn nằm dưới huy hiệu gió và không bị cung che
-      ZMAX = Math.max(2.5, Math.min(w * 0.36, h * 0.24) / R0);
-      camMax = 1 - 1 / ZMAX;
+      // giá bia (cao 2.6 bán kính) phóng to vẫn nằm dưới huy hiệu gió
+      camHit = 1 - 1 / Math.max(2.5, Math.min(w * 0.36, h * 0.24) / R0);
       sky = ctx.createLinearGradient(0, 0, 0, F.y);
       sky.addColorStop(0, '#bfeef4');
       sky.addColorStop(1, '#e9fcfb');
@@ -105,13 +107,21 @@ export function play(stage, hud, signal) {
     };
     const groundY = (z) => (z - cam <= 0.004 ? h * 4 : F.y + (GROUND * R0) / (z - cam));
 
-    const newWind = () => Math.round((Math.random() * 2 - 1) * MAX_WIND * 10) / 10;
+    // gió { a: hướng thổi trong mặt phẳng bia (0 = sang phải, π/2 = xuống), s: tốc độ }.
+    // Mỗi mũi đổi chắc chắn: lệch ít nhất 45° và 1.0 tốc độ (không lặp random, để không treo khi test cố định random)
+    const nextWind = (prev) => {
+      const span = MAX_WIND - MIN_WIND;
+      const s = prev ? MIN_WIND + ((prev.s - MIN_WIND + 1 + Math.random() * (span - 2)) % span) : MIN_WIND + Math.random() * span;
+      const a = prev ? prev.a + Math.PI / 4 + Math.random() * Math.PI * 1.5 : Math.random() * Math.PI * 2;
+      return { a: a % (Math.PI * 2), s: Math.round(s * 10) / 10 };
+    };
     // mỗi mũi bắt đầu với tâm ngắm lệch khỏi bia → phải kéo để nhắm
     const newAim = () => {
       const a = Math.random() * Math.PI * 2, r = 0.7 + Math.random() * 0.6;
       return { u: Math.cos(a) * r, v: Math.sin(a) * r };
     };
-    let wind = newWind();
+    let wind = nextWind(null);
+    const windShown = { a: wind.a, s: wind.s, pulse: 0 }; // huy hiệu xoay / đếm mượt tới gió mới
     let shot = 0; // số mũi đã bắn
     let score = 0;
     const shotPoints = [];
@@ -126,8 +136,10 @@ export function play(stage, hud, signal) {
     const floats = [];
     const sparks = [];
     let shake = 0;
-    let recoil = 0;
-    let pose = 0; // 0 = cầm cung thả lỏng, 1 = đang kéo dây
+    let pose = 0; // 0 = chưa kéo, 1 = đang kéo dây (đầu mũi tên lùi về phía người bắn)
+    let bowVis = 1; // 1 = cây cung trong khung hình, 0 = đã trượt ra ngoài
+    let jolt = 0; // giá bia giật khi mũi tên cắm
+    let stuckAt = -9; // lúc mũi tên gần nhất cắm (để đuôi rung)
 
     const aim = { on: false, pointer: null, ...newAim(), lx: 0, ly: 0 };
     // rung tay nhẹ để không thể đặt cứng tâm ngắm vào hồng tâm
@@ -154,10 +166,10 @@ export function play(stage, hud, signal) {
       aim.ly = e.clientY;
       startAim(e.pointerId);
     };
-    // kéo tương đối: tâm ngắm đi đúng quãng ngón tay đi trên bia đã phóng to
+    // kéo tương đối, chậm hơn ngón tay để nhắm chính xác được trên bia nhỏ
     const onMove = (e) => {
       if (!aim.on || e.pointerId !== aim.pointer) return;
-      const k = R0 * ZMAX;
+      const k = R0 * AIM_SENS;
       aim.u += (e.clientX - aim.lx) / k;
       aim.v += (e.clientY - aim.ly) / k;
       aim.lx = e.clientX;
@@ -209,16 +221,17 @@ export function play(stage, hud, signal) {
     function fire() {
       if (state !== 'ready') return;
       const s = sway(now);
-      // gió đẩy lệch ngang tới ~0.45 bán kính bia ở cấp mạnh nhất, kèm lệch nhỏ ngẫu nhiên
-      const u = aim.u + s.u + wind * 0.09 + (Math.random() - 0.5) * 0.04;
-      const v = aim.v + s.v + (Math.random() - 0.5) * 0.04;
+      // điểm ngắm lúc thả (kèm lệch nhỏ ngẫu nhiên) + gió đẩy tới ~0.45 bán kính bia ở tốc độ 5
+      const au = aim.u + s.u + (Math.random() - 0.5) * 0.04;
+      const av = aim.v + s.v + (Math.random() - 0.5) * 0.04;
+      const du = Math.cos(wind.a) * wind.s * 0.09, dv = Math.sin(wind.a) * wind.s * 0.09;
+      const u = au + du, v = av + dv;
       const d = Math.hypot(u, v);
-      // điểm xuất phát: chỗ mũi tên nằm trên cung, quy về toạ độ thế giới ngay trước camera
-      const [bx, by] = arrowRest();
-      const z0 = cam + 0.14;
-      flight = { u, v, points: d >= 1 ? 0 : 10 - Math.floor(d * 10), x0: ((bx - F.x) / R0) * 0.14, y0: ((by - F.y) / R0) * 0.14, z0 };
+      // điểm xuất phát: đầu mũi tên ở đáy màn hình, quy về toạ độ thế giới ngay trước camera
+      const [bx, by] = nockedTip();
+      const z0 = cam + 0.15;
+      flight = { u, v, au, av, du, dv, points: d >= 1 ? 0 : 10 - Math.floor(d * 10), x0: ((bx - F.x) / R0) * 0.15, y0: ((by - F.y) / R0) * 0.15, z0 };
       timedOut = false;
-      recoil = 1;
       setState('flying');
       sfx.release();
     }
@@ -236,7 +249,11 @@ export function play(stage, hud, signal) {
       shotPoints.push(f.points);
       hud.score(score);
       // mũi trúng giá gỗ / mặt bia thì cắm lại; bay quá giá thì mất
-      if (f.u !== null && Math.abs(f.u) <= 1.25 && f.v >= -1.3 && f.v <= 1.3) hits.push({ u: f.u, v: f.v });
+      if (f.u !== null && Math.abs(f.u) <= 1.25 && f.v >= -1.3 && f.v <= 1.3) {
+        hits.push({ u: f.u, v: f.v });
+        jolt = 1;
+        stuckAt = now;
+      }
       const [fx, fy] = f.u === null ? [F.x, F.y] : proj(f.u, f.v, 1);
       const bull = f.points === 10;
       floats.push({
@@ -296,7 +313,8 @@ export function play(stage, hud, signal) {
         flight = null;
         land(f);
       } else if (state === 'pause' && now - stateAt >= PAUSE) {
-        wind = newWind();
+        wind = nextWind(wind);
+        windShown.pulse = 1;
         Object.assign(aim, newAim());
         clockStart = now;
         lastSec = SHOT_SECONDS;
@@ -307,15 +325,25 @@ export function play(stage, hud, signal) {
         return;
       }
 
-      // camera tiến vào khi nhắm / mũi tên đang bay / vừa cắm, lùi ra khi chờ mũi kế tiếp
-      // (hết giờ không bắn thì không cần giữ góc nhìn gần)
-      const close = (state === 'ready' && aim.on) || state === 'flying'
-        || ((state === 'pause' || state === 'done') && now - stateAt < HOLD && !timedOut);
-      cam += ((close ? camMax : 0) - cam) * (1 - Math.exp(-dt * 7));
+      // camera: đứng yên khi ngắm; khi bay thì đuổi theo mũi tên (tăng tốc dần, luôn đi sau mũi tên);
+      // vừa cắm thì giữ góc gần một lúc rồi lùi về (hết giờ không bắn thì không cần giữ)
+      const hold = (state === 'pause' || state === 'done') && now - stateAt < HOLD && !timedOut;
+      if (state === 'flying') {
+        const p = Math.min(1, (now - stateAt) / FLIGHT);
+        cam = camHit * p ** 1.5;
+      } else if (!hold) cam += (0 - cam) * (1 - Math.exp(-dt * 6));
       pose += ((state === 'ready' && aim.on ? 1 : 0) - pose) * (1 - Math.exp(-dt * 10));
-      recoil *= Math.exp(-dt * 6);
+      const showBow = (state === 'ready' && !aim.on) || (state === 'pause' && now - stateAt >= HOLD);
+      bowVis += ((showBow ? 1 : 0) - bowVis) * (1 - Math.exp(-dt * 8));
       shake = Math.max(0, shake - dt);
-      cloudDx += wind * dt * m * 0.012;
+      jolt *= Math.exp(-dt * 14);
+      // huy hiệu gió: xoay theo đường ngắn nhất, số chạy tới tốc độ mới
+      const da = Math.atan2(Math.sin(wind.a - windShown.a), Math.cos(wind.a - windShown.a));
+      const kw = 1 - Math.exp(-dt * 6);
+      windShown.a += da * kw;
+      windShown.s += (wind.s - windShown.s) * kw;
+      windShown.pulse = Math.max(0, windShown.pulse - dt * 2.5);
+      cloudDx += Math.cos(wind.a) * wind.s * dt * m * 0.012;
 
       draw(dt);
       raf = requestAnimationFrame(frame);
@@ -323,7 +351,7 @@ export function play(stage, hud, signal) {
 
     /* ───────── vẽ ───────── */
     function draw(dt) {
-      const zp = camMax ? cam / camMax : 0; // 0..1 mức tiến vào
+      const zp = camHit ? cam / camHit : 0; // 0..1 mức tiến vào
       ctx.save();
       if (shake > 0) ctx.translate((Math.random() - 0.5) * 14 * shake, (Math.random() - 0.5) * 10 * shake);
 
@@ -361,10 +389,11 @@ export function play(stage, hud, signal) {
       if (aim.on && state === 'ready') {
         const s = sway(now);
         const [x, y, sc] = proj(aim.u + s.u, aim.v + s.v, 1);
-        drawCrosshair(x, y, Math.max(10, Math.min(26, sc * 0.2)));
+        drawCrosshair(x, y, Math.max(8, Math.min(20, sc * 0.35)));
       }
       ctx.restore();
 
+      drawNocked();
       drawBow();
       drawSparks(dt);
       drawFloats(dt);
@@ -504,7 +533,9 @@ export function play(stage, hud, signal) {
     }
 
     function drawTarget() {
-      const [cx, cy, s] = proj(0, 0, 1);
+      const [px, py, s] = proj(0, 0, 1);
+      // giá bia giật nhẹ khi mũi tên cắm
+      const cx = px + Math.sin(now * 70) * jolt * s * 0.05, cy = py + jolt * s * 0.03;
       const lw = ink(s);
       ctx.lineWidth = lw;
       ctx.strokeStyle = INK;
@@ -547,13 +578,16 @@ export function play(stage, hud, signal) {
       ctx.beginPath();
       ctx.arc(cx, cy, s, 0, Math.PI * 2);
       ctx.stroke();
-      for (const p of hits) drawStuck(cx + p.u * s, cy + p.v * s, s);
+      // mũi vừa cắm thì đuôi còn rung
+      const age = now - stuckAt;
+      const wob = age < 0.6 ? Math.sin(age * 45) * (1 - age / 0.6) * 0.35 : 0;
+      hits.forEach((p, i) => drawStuck(cx + p.u * s, cy + p.v * s, s, i === hits.length - 1 ? wob : 0));
     }
 
-    function drawStuck(x, y, s) {
-      // đuôi mũi tên chĩa về phía người bắn (dưới phải, nơi cầm cung)
+    function drawStuck(x, y, s, wob) {
+      // đuôi mũi tên chĩa về phía người bắn (dưới, hơi lệch phải)
       const L = s * 0.32;
-      const ex = x + L * 0.55, ey = y + L * 0.85;
+      const ex = x + L * (0.35 + wob), ey = y + L * (0.9 - Math.abs(wob) * 0.2);
       ctx.strokeStyle = '#6b3d22';
       ctx.lineWidth = Math.max(1.5, s * 0.045);
       ctx.lineCap = 'round';
@@ -580,29 +614,49 @@ export function play(stage, hud, signal) {
       ctx.lineCap = 'butt';
     }
 
-    /** Vị trí mũi tên trên đường bay (toạ độ thế giới), p = 0..1. */
+    /**
+     * Vị trí mũi tên trên đường bay (toạ độ thế giới), p = 0..1: bay thẳng tới điểm ngắm, gió đẩy lệch
+     * tăng dần (p²) nên đường bay cong và cắm đúng điểm ngắm + gió; vồng lên vì trọng lực; thân rung lúc mới rời dây.
+     */
     function flightPos(p) {
       const f = flight;
-      return [f.x0 + (f.u - f.x0) * p, f.y0 + (f.v - f.y0) * p - Math.sin(p * Math.PI) * 0.5, f.z0 + (1 - f.z0) * p];
+      const wob = Math.sin(p * 26) * 0.06 * (1 - p);
+      return [
+        f.x0 + (f.au - f.x0) * p + f.du * p * p + wob,
+        f.y0 + (f.av - f.y0) * p + f.dv * p * p - Math.sin(p * Math.PI) * 0.8,
+        f.z0 + (1 - f.z0) * p,
+      ];
     }
 
     function drawFlying() {
       const p = Math.min(1, (now - stateAt) / FLIGHT);
+      // vệt gió mờ phía sau
+      ctx.lineCap = 'round';
+      for (let i = 3; i >= 1; i--) {
+        const a = proj(...flightPos(Math.max(0, p - i * 0.045)));
+        const b = proj(...flightPos(Math.max(0, p - (i - 1) * 0.045)));
+        ctx.strokeStyle = `rgba(255,255,255,${0.32 - i * 0.08})`;
+        ctx.lineWidth = Math.max(1, b[2] * 0.06);
+        ctx.beginPath();
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+        ctx.stroke();
+      }
       const tail = proj(...flightPos(p));
-      const tip = proj(...flightPos(Math.min(1, p + 0.08)));
+      const tip = proj(...flightPos(Math.min(1, p + 0.06)));
       const sc = tail[2];
       ctx.strokeStyle = '#6b3d22';
-      ctx.lineCap = 'round';
       ctx.lineWidth = Math.max(1.5, sc * 0.05);
       ctx.beginPath();
       ctx.moveTo(tail[0], tail[1]);
       ctx.lineTo(tip[0], tip[1]);
       ctx.stroke();
       ctx.lineCap = 'butt';
-      // lông đuôi nhìn từ phía sau: 3 cánh toả ra
+      // lông đuôi nhìn từ phía sau: 3 cánh toả ra, xoay khi bay
       ctx.fillStyle = '#e8202e';
-      const f = sc * 0.14;
-      for (const a of [-Math.PI / 2, Math.PI / 6, (Math.PI * 5) / 6]) {
+      const f = sc * 0.14, spin = p * 12;
+      for (const a0 of [-Math.PI / 2, Math.PI / 6, (Math.PI * 5) / 6]) {
+        const a = a0 + spin;
         ctx.beginPath();
         ctx.moveTo(tail[0], tail[1]);
         ctx.lineTo(tail[0] + Math.cos(a - 0.25) * f, tail[1] + Math.sin(a - 0.25) * f);
@@ -615,13 +669,14 @@ export function play(stage, hud, signal) {
     function drawPetals(dt) {
       if (!petals.length) return;
       ctx.fillStyle = '#ffb3cf';
-      const sp = m * 0.0015;
+      // bay theo véc-tơ gió (mọi hướng), thêm chút rơi và chao
+      const wx = Math.cos(wind.a) * wind.s, wy = Math.sin(wind.a) * wind.s;
       for (const p of petals) {
         p.ph += dt * 2;
-        p.x += (wind * 0.06 + 0.01 + Math.sin(p.ph) * 0.01) * dt * sp * 6;
-        p.y += (0.025 + Math.cos(p.ph * 0.7) * 0.01) * dt;
+        p.x += (wx * 0.04 + Math.sin(p.ph) * 0.012) * dt;
+        p.y += (0.02 + wy * 0.03 + Math.cos(p.ph * 0.7) * 0.01) * dt;
         p.x = ((p.x % 1.2) + 1.2) % 1.2;
-        if (p.y > 1) p.y -= 1;
+        p.y = ((p.y % 1) + 1) % 1;
         const x = p.x * w - w * 0.1, y = p.y * h;
         ctx.beginPath();
         ctx.ellipse(x, y, m * 0.009 * p.r, m * 0.005 * p.r, p.ph, 0, Math.PI * 2);
@@ -647,20 +702,64 @@ export function play(stage, hud, signal) {
       }
     }
 
-    /** Cung đặt bên phải; khi kéo dây thì trượt nhẹ vào giữa, khi bắn thì giật lại. */
+    /** Cung đặt bên phải; lúc ngắm / bắn thì trượt hẳn ra góc dưới phải, chỉ còn đầu mũi tên. */
     function bowPos() {
-      const s = sway(now);
-      // khi kéo dây cung lùi ra mép phải để không che bia đã phóng to
-      const gx = w - m * 0.11 + pose * m * 0.07 + recoil * m * 0.04 + s.u * m * 0.05 * pose;
-      const gy = h * 0.52 + pose * h * 0.02 - recoil * m * 0.03 + s.v * m * 0.05 * pose;
-      return [gx, gy];
+      const out = 1 - bowVis;
+      return [w - m * 0.11 + out * m * 0.55, h * 0.52 + out * h * 0.35];
     }
-    function arrowRest() {
-      const [gx, gy] = bowPos();
-      return [gx - m * 0.06, gy];
+
+    /** Đầu mũi tên lúc kéo dây: giữa đáy màn hình, càng kéo càng lùi xuống (về phía người bắn). */
+    function nockedTip() {
+      const s = sway(now);
+      return [w / 2 + s.u * m * 0.15, h - m * 0.26 + pose * m * 0.07 + s.v * m * 0.1];
+    }
+
+    function drawNocked() {
+      if (state !== 'ready' || pose < 0.02) return;
+      const [tx, ty] = nockedTip();
+      // chĩa về phía tâm ngắm
+      const s = sway(now);
+      const [cx, cy] = proj(aim.u + s.u, aim.v + s.v, 1);
+      const ang = Math.atan2(cy - ty, cx - tx);
+      const th = Math.max(10, m * 0.035), head = Math.max(26, m * 0.1);
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, pose * 1.5);
+      ctx.translate(tx, ty);
+      ctx.rotate(ang);
+      // thân gỗ chạy ra khỏi đáy màn hình
+      ctx.lineCap = 'butt';
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = th + 5;
+      ctx.beginPath();
+      ctx.moveTo(-head * 0.6, 0);
+      ctx.lineTo(-h, 0);
+      ctx.stroke();
+      ctx.strokeStyle = '#8a4a2c';
+      ctx.lineWidth = th;
+      ctx.stroke();
+      // mũi thép
+      ctx.fillStyle = '#9aa3ad';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(head * 0.35, 0);
+      ctx.lineTo(-head * 0.75, -head * 0.36);
+      ctx.lineTo(-head * 0.6, 0);
+      ctx.lineTo(-head * 0.75, head * 0.36);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath();
+      ctx.moveTo(head * 0.3, 0);
+      ctx.lineTo(-head * 0.68, -head * 0.3);
+      ctx.lineTo(-head * 0.55, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
     }
 
     function drawBow() {
+      if (bowVis < 0.02) return;
       const [gx, gy] = bowPos();
       const th = Math.max(14, m * 0.055); // độ dày cánh cung
       const g = h * 0.07; // nửa chiều dài tay cầm
@@ -672,7 +771,7 @@ export function play(stage, hud, signal) {
       };
       // dây cung (phía sau cánh)
       const tipX = gx + th * 2.6;
-      const nock = [tipX + th * 0.4 - pose * th * 1.8, gy];
+      const nock = [tipX + th * 0.4, gy];
       ctx.strokeStyle = '#3b3b3b';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -714,7 +813,7 @@ export function play(stage, hud, signal) {
       }
       // mũi tên nằm trên tay đỡ khi đang sẵn sàng
       if (state === 'ready') {
-        const [ax, ay] = arrowRest();
+        const ax = gx - m * 0.06, ay = gy;
         ctx.strokeStyle = INK;
         ctx.lineWidth = th * 0.34 + 4;
         ctx.beginPath();
@@ -775,10 +874,10 @@ export function play(stage, hud, signal) {
       ctx.globalAlpha = 1;
     }
 
-    /** Huy hiệu gió giữa phía trên: biểu tượng hướng + cấp gió có 1 chữ số thập phân. */
+    /** Huy hiệu gió giữa phía trên: mũi tên chỉ hướng gió thổi + tốc độ có 1 chữ số thập phân. */
     function drawWind() {
       const fs = Math.max(13, Math.min(20, m * 0.042));
-      const val = Math.abs(wind).toFixed(1);
+      const val = windShown.s.toFixed(1);
       const num = getLang() === 'vi' ? val.replace('.', ',') : val;
       ctx.font = `800 ${fs}px "Be Vietnam Pro", sans-serif`;
       const label = t('archery.wind');
@@ -786,6 +885,12 @@ export function play(stage, hud, signal) {
       const ph = fs * 2.7, ir = ph * 0.4;
       const pw = ph * 0.5 + ir * 2 + fs * 0.6 + tw + ph * 0.35;
       const x = (w - pw) / 2, y = 10;
+      // nảy nhẹ khi gió đổi
+      const pop = 1 + Math.sin(windShown.pulse * Math.PI) * 0.12;
+      ctx.save();
+      ctx.translate(w / 2, y + ph / 2);
+      ctx.scale(pop, pop);
+      ctx.translate(-w / 2, -(y + ph / 2));
       rr(x, y, pw, ph, ph / 2);
       ctx.fillStyle = 'rgba(70,84,92,0.62)';
       ctx.fill();
@@ -797,26 +902,21 @@ export function play(stage, hud, signal) {
       ctx.lineWidth = 3;
       ctx.strokeStyle = '#ffcf3a';
       ctx.stroke();
-      // 2 chevron chỉ hướng gió (lật khi gió sang trái), không gió thì vẽ dấu gạch
+      // mũi tên chỉ hướng gió thổi, xoay mượt khi gió đổi
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(windShown.a);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.lineWidth = Math.max(2.5, ir * 0.2);
       ctx.beginPath();
-      if (Math.abs(wind) < 0.05) {
-        ctx.moveTo(cx - ir * 0.4, cy);
-        ctx.lineTo(cx + ir * 0.4, cy);
-      } else {
-        const d = Math.sign(wind);
-        for (const off of [-0.22, 0.22]) {
-          const ox = cx + off * ir * 1.4 * d;
-          ctx.moveTo(ox - d * ir * 0.2, cy - ir * 0.35);
-          ctx.lineTo(ox + d * ir * 0.15, cy);
-          ctx.lineTo(ox - d * ir * 0.2, cy + ir * 0.35);
-        }
-      }
+      ctx.moveTo(-ir * 0.5, 0);
+      ctx.lineTo(ir * 0.45, 0);
+      ctx.moveTo(ir * 0.1, -ir * 0.35);
+      ctx.lineTo(ir * 0.5, 0);
+      ctx.lineTo(ir * 0.1, ir * 0.35);
       ctx.stroke();
-      ctx.lineCap = 'butt';
-      ctx.lineJoin = 'miter';
+      ctx.restore();
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'left';
       const tx = cx + ir + fs * 0.6;
@@ -824,16 +924,24 @@ export function play(stage, hud, signal) {
       ctx.fillText(label, tx, cy - fs * 0.15);
       ctx.font = `900 ${Math.round(fs * 1.15)}px "Be Vietnam Pro", sans-serif`;
       ctx.fillText(num, tx, cy + fs * 1.05);
+      ctx.restore();
     }
 
-    /** 5 ô điểm từng mũi ở góc dưới bên trái. */
+    /**
+     * 5 ô điểm từng mũi ở phía trên (đáy màn hình dành cho đầu mũi tên): màn rộng thì ở góc trên trái
+     * cùng hàng với huy hiệu gió, màn hẹp thì nằm giữa ngay dưới huy hiệu.
+     */
     function drawShots() {
       const r = Math.max(13, Math.min(19, m * 0.04));
-      const y = h - r - 14;
+      const rowW = ARROWS * r * 2 + (ARROWS - 1) * 6;
+      const badgeH = Math.max(13, Math.min(20, m * 0.042)) * 2.7;
+      const wide = w >= 600;
+      const x0 = wide ? 14 : (w - rowW) / 2;
+      const y = wide ? 10 + badgeH / 2 : 10 + badgeH + 10 + r;
       ctx.textAlign = 'center';
       ctx.font = `800 ${Math.round(r * 0.95)}px "Be Vietnam Pro", sans-serif`;
       for (let i = 0; i < ARROWS; i++) {
-        const x = 14 + r + i * (r * 2 + 6);
+        const x = x0 + r + i * (r * 2 + 6);
         const p = shotPoints[i];
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);

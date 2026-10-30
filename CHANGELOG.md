@@ -9,6 +9,7 @@ Ghi lại các thay đổi đáng chú ý của trang YEP 2026. Mục mới nh�
   - `firestore.rules`: trần 50 điểm, chơi tối thiểu 6 giây, tổng điểm tính thêm `archery` (doc cũ thiếu field coi như 0). **Cần Publish lại rules trên Firebase Console trước khi đưa code lên**, nếu không lượt Bắn cung sẽ bị từ chối.
   - Trang quản trị: thêm cột *Bắn cung* ở bảng điểm và file CSV.
   - Giao diện Bắn cung làm lại: góc nhìn người bắn, cảnh trời–núi–cây–bãi cỏ phong cách flat (thêm hoa đào, đèn lồng), camera tiến vào bia khi nhắm (phối cảnh 3D, parallax), mũi tên bay xa dần, huy hiệu gió, ô điểm từng mũi, hiệu ứng hồng tâm. Kéo tương đối để di chuyển tâm ngắm. Chạy trên điện thoại, tablet (cả xoay ngang) và máy tính. Không đổi luật, không cần publish lại rules.
+  - Bắn cung, cảm giác bắn: lúc kéo dây cây cung trượt ra khỏi khung hình, chỉ còn đầu mũi tên và tâm ngắm, bia giữ nguyên cỡ; khi thả, camera đuổi theo mũi tên tới bia (bia to dần). Mũi tên bay ~1 giây, cong theo gió, vồng lên, thân rung, lông đuôi xoay, có vệt gió; cắm vào thì giá bia giật và đuôi rung. Gió thổi từ mọi hướng (0–360°), đổi hướng ≥ 45° và tốc độ ≥ 1 sau mỗi lượt; huy hiệu gió xoay theo hướng mới. Không cần publish lại rules.
 - **Trang quản trị: cấp / thu hồi quyền admin** (mục *Quản trị viên*), không cần vào Firebase Console.
   - Thêm admin bằng Gmail, xem danh sách admin (ai thêm, lúc nào), xoá quyền.
   - Không tự xoá quyền của chính mình được, nên luôn còn ít nhất một admin.
