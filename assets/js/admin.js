@@ -260,7 +260,7 @@ async function start() {
     tbody.innerHTML = scores.map((s, i) => `
       <tr class="${s.banned ? 'is-banned' : ''}">
         <td>${i + 1}</td><td>${esc(s.msnv)}</td><td>${esc(s.name)}</td>
-        <td>${s.lixi}</td><td>${s.quiz}</td><td>${s.memory}</td><td><b>${s.total}</b></td>
+        <td>${s.lixi}</td><td>${s.quiz}</td><td>${s.memory}</td><td>${s.archery ?? 0}</td><td><b>${s.total}</b></td>
         <td>${fmt(s.updatedAt)}</td>
         <td><button class="btn btn-ghost btn-small" type="button" data-uid="${s.uid}">${s.banned ? 'Khôi phục' : 'Loại'}</button></td>
       </tr>`).join('');
@@ -274,7 +274,7 @@ async function start() {
     if (!btn) return;
     const s = scores.find((x) => x.uid === btn.dataset.uid);
     // loại: tổng về 0 để rời bảng xếp hạng, điểm từng game giữ lại để đối chiếu
-    const patch = s.banned ? { banned: false, total: s.lixi + s.quiz + s.memory } : { banned: true, total: 0 };
+    const patch = s.banned ? { banned: false, total: s.lixi + s.quiz + s.memory + (s.archery ?? 0) } : { banned: true, total: 0 };
     if (!s.banned && !confirm(`Loại kết quả của ${s.name} (${s.msnv})?`)) return;
     await updateDoc(doc(db, 'scores', s.uid), patch);
     await load();
@@ -282,8 +282,8 @@ async function start() {
 
   $('#btn-export').addEventListener('click', () => {
     downloadCsv(`yep2026-bang-diem-${new Date().toISOString().slice(0, 10)}.csv`,
-      [['Hạng', 'MSNV', 'Họ tên', 'Hứng lì xì', 'Đố vui', 'Lật thẻ', 'Tổng', 'Cập nhật', 'Bị loại']]
-        .concat(scores.map((s, i) => [i + 1, s.msnv, s.name, s.lixi, s.quiz, s.memory, s.total, fmt(s.updatedAt), s.banned ? 'x' : ''])));
+      [['Hạng', 'MSNV', 'Họ tên', 'Hứng lì xì', 'Đố vui', 'Lật thẻ', 'Bắn cung', 'Tổng', 'Cập nhật', 'Bị loại']]
+        .concat(scores.map((s, i) => [i + 1, s.msnv, s.name, s.lixi, s.quiz, s.memory, s.archery ?? 0, s.total, fmt(s.updatedAt), s.banned ? 'x' : ''])));
   });
 
   /* ── 4 · ngân hàng câu hỏi ── */

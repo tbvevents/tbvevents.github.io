@@ -5,6 +5,9 @@ Ghi lại các thay đổi đáng chú ý của trang YEP 2026. Mục mới nh�
 ## 2026-10-30
 
 ### Thêm
+- **Game thứ 4: Bắn cung 🏹** (`assets/js/minigame/archery.js`). 5 mũi tên, chạm-kéo để nhắm, thả để bắn; hồng tâm 10 điểm giảm dần ra ngoài, trượt 0; gió ngẫu nhiên mỗi mũi; tối đa 50 điểm, cộng vào tổng điểm Top 10.
+  - `firestore.rules`: trần 50 điểm, chơi tối thiểu 6 giây, tổng điểm tính thêm `archery` (doc cũ thiếu field coi như 0). **Cần Publish lại rules trên Firebase Console trước khi đưa code lên**, nếu không lượt Bắn cung sẽ bị từ chối.
+  - Trang quản trị: thêm cột *Bắn cung* ở bảng điểm và file CSV.
 - **Trang quản trị: cấp / thu hồi quyền admin** (mục *Quản trị viên*), không cần vào Firebase Console.
   - Thêm admin bằng Gmail, xem danh sách admin (ai thêm, lúc nào), xoá quyền.
   - Không tự xoá quyền của chính mình được, nên luôn còn ít nhất một admin.

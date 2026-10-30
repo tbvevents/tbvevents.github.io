@@ -33,6 +33,7 @@ const loaders = {
   lixi: () => import('./lixi.js'),
   quiz: () => import('./quiz.js'),
   memory: () => import('./memory.js'),
+  archery: () => import('./archery.js'),
 };
 
 const now = () => Date.now();
@@ -178,13 +179,14 @@ async function start() {
       const isQuiz = g.id === 'quiz';
       const left = isQuiz ? (quizLeft ? tn('mg.quiz.left', quizLeft) : t('mg.quiz.out')) : '';
       const enabled = open && !score.banned && (!isQuiz || quizLeft > 0);
+      const best = score[g.id] ?? 0; // doc điểm tạo trước khi có game mới thì chưa có field của game đó
       return `
       <li>
         <button class="game-tile" type="button" data-play="${g.id}" title="${L(g.title)}"
-          aria-label="${t('mg.tile.aria', { title: L(g.title), best: score[g.id], max: g.max })}${left ? `. ${left}` : ''}" ${enabled ? '' : 'disabled'}>
+          aria-label="${t('mg.tile.aria', { title: L(g.title), best, max: g.max })}${left ? `. ${left}` : ''}" ${enabled ? '' : 'disabled'}>
           <span class="game-icon" aria-hidden="true">${g.icon}</span>
           <span class="game-name">${L(g.short)}</span>
-          <span class="game-best"><b>${score[g.id]}</b>/${g.max}</span>
+          <span class="game-best"><b>${best}</b>/${g.max}</span>
           ${left ? `<span class="game-left${quizLeft ? '' : ' is-out'}">${left}</span>` : ''}
         </button>
       </li>`;
@@ -331,7 +333,7 @@ async function start() {
   }
 
   async function showResult(g, result) {
-    const best = score[g.id];
+    const best = score[g.id] ?? 0;
     resultGame = g;
     $('#res-score').textContent = result;
     $('#res-max').textContent = g.max;

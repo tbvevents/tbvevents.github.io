@@ -42,7 +42,7 @@ export async function claimMsnv(msnv, name) {
   batch.set(doc(db, 'users', user.uid), { msnv, email: user.email, createdAt: serverTimestamp() });
   batch.update(doc(db, 'employees', msnv), { claimedBy: user.uid });
   batch.set(doc(db, 'scores', user.uid), {
-    msnv, name, lixi: 0, quiz: 0, memory: 0, total: 0, updatedAt: serverTimestamp(), session: null,
+    msnv, name, lixi: 0, quiz: 0, memory: 0, archery: 0, total: 0, updatedAt: serverTimestamp(), session: null,
   });
   await batch.commit();
   rememberMsnv(msnv);
@@ -82,11 +82,12 @@ export function startSession(game, current) {
  * `current` là doc scores hiện tại. Trả về true nếu đã ghi kỷ lục mới.
  */
 export async function submitScore(game, score, current) {
-  if (score <= current[game]) return false;
+  if (score <= (current[game] ?? 0)) return false;
   const next = { ...current, [game]: score };
   await updateDoc(doc(db, 'scores', auth.currentUser.uid), {
     [game]: score,
-    total: next.lixi + next.quiz + next.memory,
+    // doc điểm tạo trước khi có Bắn cung không có field archery → tính là 0 (khớp với rules)
+    total: next.lixi + next.quiz + next.memory + (next.archery ?? 0),
     updatedAt: serverTimestamp(),
     session: null,
   });

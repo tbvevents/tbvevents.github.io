@@ -58,8 +58,8 @@ Thêm `?debug` vào URL để truy cập scene qua `window.__yep` trong DevTools
 
 ## Mini game & bảng xếp hạng (Firebase miễn phí)
 
-Nhân viên đăng nhập Gmail ở `minigame.html`, nhập MSNV (phải có trong danh sách nhân viên), rồi chơi 3 game:
-Hứng lì xì, Đố vui Tết ba miền, Lật thẻ ghép đôi. Mỗi game giữ lượt cao nhất; tổng 3 game quyết định Top 10,
+Nhân viên đăng nhập Gmail ở `minigame.html`, nhập MSNV (phải có trong danh sách nhân viên), rồi chơi 4 game:
+Hứng lì xì, Đố vui Tết ba miền, Lật thẻ ghép đôi, Bắn cung. Mỗi game giữ lượt cao nhất; tổng 4 game quyết định Top 10,
 hiển thị realtime ở section "Mini game" của landing page. `admin.html` dành cho BTC.
 
 Dùng Firebase gói **Spark** (miễn phí, không cần thẻ): Authentication (Google) + Cloud Firestore.
@@ -95,6 +95,12 @@ nằm trong [`firestore.rules`](firestore.rules).
 ### Đổi thời gian / trần điểm / số lượt
 
 Sửa `GAMES` trong `config.js` **và** các hàm `gameOpen()`, `maxScore()`, `minSeconds()`, `quizDailyPlays()` trong `firestore.rules` (publish lại rules).
+
+### Bắn cung
+
+- 5 mũi tên, mỗi mũi 10 giây. Bia 10 vòng: hồng tâm 10 điểm, mỗi vòng ra ngoài bớt 1; ngoài bia hoặc hết giờ chưa bắn: 0. Tối đa 50.
+- Gió đổi ngẫu nhiên mỗi mũi (cấp 0–5, hiện ở góc trên bên trái), đẩy lệch mũi tên theo chiều ngang. Code: [`assets/js/minigame/archery.js`](assets/js/minigame/archery.js).
+- Người chơi cũ (doc `scores` chưa có field `archery`) không cần chuyển dữ liệu: rules và code đều coi thiếu là 0.
 
 ### Đố vui: kho câu hỏi và giới hạn lượt
 

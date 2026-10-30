@@ -148,8 +148,8 @@ export const S = {
   'mg.login.kicker': ['Mini game · Du xuân ba miền', 'Mini games · Spring journey across three regions'],
   'mg.login.title': ['Chơi game, rinh quà Tết', 'Play games, win Tết prizes'],
   'mg.login.intro': [
-    '3 trò chơi nhỏ, mỗi trò tính lượt có điểm cao nhất. Tổng điểm cao nhất lọt <b>Top 10</b> trên trang sự kiện.',
-    '3 little games, each keeping your best score. The highest totals make the <b>Top 10</b> on the event page.',
+    '4 trò chơi nhỏ, mỗi trò tính lượt có điểm cao nhất. Tổng điểm cao nhất lọt <b>Top 10</b> trên trang sự kiện.',
+    '4 little games, each keeping your best score. The highest totals make the <b>Top 10</b> on the event page.',
   ],
   'mg.login.deadline': ['Hạn chót tính điểm:', 'Scoring deadline:'],
   'mg.login.inapp': [
@@ -226,4 +226,10 @@ export const S = {
     'Khu vực chơi Hứng lì xì: kéo ngón tay hoặc dùng phím mũi tên để di chuyển giỏ',
     'Catch the Lucky Money play area: drag your finger or use the arrow keys to move the basket',
   ],
+  'archery.aria': [
+    'Khu vực chơi Bắn cung: chạm và kéo để nhắm, thả tay để bắn; hoặc dùng phím mũi tên để nhắm và phím cách để bắn',
+    'Archery play area: touch and drag to aim, release to shoot; or use the arrow keys to aim and Space to shoot',
+  ],
+  'archery.wind': ['Gió', 'Wind'],
+  'archery.miss': ['Trượt!', 'Miss!'],
 };

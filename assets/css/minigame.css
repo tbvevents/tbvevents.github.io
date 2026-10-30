@@ -59,7 +59,7 @@
 .me-stats b { display: block; font-family: var(--serif); font-size: 26px; color: var(--gold); line-height: 1.1; font-variant-numeric: tabular-nums; }
 .me-stats span { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-soft); }
 .lobby-label { margin: 18px 0 8px; font-size: 11px !important; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
-.game-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.game-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .game-tile {
   all: unset;
   box-sizing: border-box;
@@ -196,6 +196,7 @@ body.is-playing .mg-main { padding-top: max(10px, env(safe-area-inset-top, 0px))
 @keyframes pop { from { transform: scale(1.6); opacity: 0; } 30% { opacity: 1; } to { transform: scale(1); opacity: 0.9; } }
 
 .lixi-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: ew-resize; }
+.archery-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none; }
 
 .quiz { padding: clamp(18px, 4vw, 32px); align-self: start; overflow-y: auto; max-height: 100%; width: min(720px, 100%); justify-self: center; }
 .quiz-count { margin: 0 0 8px; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
@@ -323,6 +324,7 @@ body.is-playing .mg-main { padding-top: max(10px, env(safe-area-inset-top, 0px))
   .hud { gap: 8px; padding: 8px 10px; }
   .hud strong { font-size: 13px; }
   .hud .btn-small { padding: 7px 12px; }
+  .game-list { grid-template-columns: repeat(2, 1fr); }
   .game-icon { font-size: 28px; }
   .game-name { font-size: 13px; }
 }

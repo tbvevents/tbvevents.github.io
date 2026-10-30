@@ -6,7 +6,8 @@ rules_version = '2';
 // Dữ liệu:
 //   employees/{msnv}  { name, claimedBy }                 admin nạp từ CSV
 //   users/{uid}       { msnv, email, createdAt }          1 Gmail ↔ 1 MSNV
-//   scores/{uid}      { msnv, name, lixi, quiz, memory, total, updatedAt, session, quizDay?, quizPlays?, banned? }
+//   scores/{uid}      { msnv, name, lixi, quiz, memory, archery?, total, updatedAt, session, quizDay?, quizPlays?, banned? }
+//                     archery thiếu ở doc tạo trước khi có game Bắn cung → coi như 0
 //   admins/{email}    { addedBy?, addedAt? }              admin tạo tay trong Console (không có addedBy) = admin gốc; admin thêm ở admin.html có addedBy
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -30,8 +31,8 @@ service cloud.firestore {
     }
 
     // Trần điểm và thời gian chơi tối thiểu / tối đa của mỗi lượt — giữ khớp với GAMES.list
-    function maxScore(g) { return g == 'lixi' ? 64 : 100; }
-    function minSeconds(g) { return g == 'lixi' ? 30 : g == 'quiz' ? 15 : 8; }
+    function maxScore(g) { return g == 'lixi' ? 64 : g == 'archery' ? 50 : 100; }
+    function minSeconds(g) { return g == 'lixi' ? 30 : g == 'quiz' ? 15 : g == 'archery' ? 6 : 8; }
     function maxSeconds(g) { return 600; }
 
     // Đố vui: tối đa 3 lượt mỗi ngày (giờ VN) — giữ khớp với GAMES.quizDailyPlays trong config.js
@@ -83,10 +84,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       allow create: if isMe(uid)
-        && request.resource.data.keys().hasOnly(['msnv', 'name', 'lixi', 'quiz', 'memory', 'total', 'updatedAt', 'session'])
+        && request.resource.data.keys().hasOnly(['msnv', 'name', 'lixi', 'quiz', 'memory', 'archery', 'total', 'updatedAt', 'session'])
         && request.resource.data.msnv == getAfter(userDoc(uid)).data.msnv
         && request.resource.data.name == get(employeeDoc(request.resource.data.msnv)).data.name
         && request.resource.data.lixi == 0 && request.resource.data.quiz == 0 && request.resource.data.memory == 0
+        && request.resource.data.get('archery', 0) == 0
         && request.resource.data.total == 0
         && request.resource.data.session == null
         && request.resource.data.updatedAt == request.time;
@@ -99,7 +101,7 @@ service cloud.firestore {
           && s.keys().hasOnly(['game', 'startedAt'])
           && s.startedAt == request.time
           && (old == null || request.time > old.startedAt + duration.value(5, 's'))
-          && ((s.game in ['lixi', 'memory'] && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['session']))
+          && ((s.game in ['lixi', 'memory', 'archery'] && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['session']))
             || (s.game == 'quiz' && quizStartOk()));
       }
 
@@ -123,8 +125,8 @@ service cloud.firestore {
         return d.diff(resource.data).affectedKeys().hasOnly([g, 'total', 'updatedAt', 'session'])
           && d.session == null
           && d.updatedAt == request.time
-          && d[g] is int && d[g] > resource.data[g] && d[g] <= maxScore(g)
-          && d.total == d.lixi + d.quiz + d.memory
+          && d[g] is int && d[g] > resource.data.get(g, 0) && d[g] <= maxScore(g)
+          && d.total == d.lixi + d.quiz + d.memory + d.get('archery', 0)
           && request.time >= old.startedAt + duration.value(minSeconds(g), 's')
           && request.time <= old.startedAt + duration.value(maxSeconds(g), 's');
       }

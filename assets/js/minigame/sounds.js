@@ -100,3 +100,21 @@ export function mismatch() {
   tone(NOTE.E5, { dur: 0.12, type: 'sine', vol: 0.14 });
   tone(NOTE.C5 * 0.9, { at: 0.1, dur: 0.2, type: 'sine', vol: 0.12 });
 }
+
+/* ── Bắn cung ── */
+/** Kéo căng dây cung. */
+export const drawBow = () => noiseHit({ dur: 0.18, type: 'bandpass', freq: 700, q: 4, vol: 0.18 });
+/** Thả dây: tiếng vút. */
+export function release() {
+  noiseHit({ dur: 0.25, type: 'highpass', freq: 2500, vol: 0.2 });
+  tone(330, { dur: 0.12, type: 'sine', vol: 0.12, slide: -150 });
+}
+/** Mũi tên cắm vào bia: tiếng phập, điểm càng cao nốt càng cao. */
+export function hit(points) {
+  noiseHit({ dur: 0.08, type: 'lowpass', freq: 600, vol: 0.5 });
+  if (points >= 10) [NOTE.C6, NOTE.E6, NOTE.G6, NOTE.C7].forEach((f, i) => tone(f, { at: 0.06 + i * 0.05, dur: 0.2, vol: 0.15 }));
+  else tone(NOTE.C5 * (1 + points / 10), { at: 0.05, dur: 0.22, vol: 0.16 });
+}
+export function miss() {
+  tone(220, { dur: 0.3, type: 'sine', vol: 0.12, slide: -90 });
+}
